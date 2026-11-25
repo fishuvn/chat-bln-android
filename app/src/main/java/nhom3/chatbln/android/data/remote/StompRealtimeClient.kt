@@ -16,6 +16,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import nhom3.chatbln.android.data.local.SessionPreferences
 import nhom3.chatbln.android.data.model.DeleteMessagesResponse
+import nhom3.chatbln.android.data.model.FriendshipEventDto
 import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.data.model.PresenceEvent
 import okhttp3.OkHttpClient
@@ -49,6 +50,9 @@ class StompRealtimeClient(
     private val _deletionEvents = MutableSharedFlow<DeleteMessagesResponse>(extraBufferCapacity = 64)
     val deletionEvents: SharedFlow<DeleteMessagesResponse> = _deletionEvents.asSharedFlow()
 
+    private val _friendshipEvents = MutableSharedFlow<FriendshipEventDto>(extraBufferCapacity = 64)
+    val friendshipEvents: SharedFlow<FriendshipEventDto> = _friendshipEvents.asSharedFlow()
+
     private val desiredTopics = ConcurrentHashMap<String, String>()
     private val activeTopics = ConcurrentHashMap.newKeySet<String>()
     private val subCounter = AtomicInteger(1)
@@ -77,6 +81,7 @@ class StompRealtimeClient(
         ensureTopicRegistered(TOPIC_PRESENCE)
         ensureTopicRegistered("/topic/users/$cleanUser")
         ensureTopicRegistered("/topic/users/$cleanUser/deletions")
+        ensureTopicRegistered("/topic/friendships/$cleanUser")
 
         if (_isConnected.value || !isConnecting.compareAndSet(false, true)) {
             return
@@ -248,6 +253,12 @@ class StompRealtimeClient(
                         runCatching { gson.fromJson(payload, DeleteMessagesResponse::class.java) }
                             .getOrNull()
                             ?.let { _deletionEvents.tryEmit(it) }
+                    }
+
+                    destination.startsWith("/topic/friendships/") -> {
+                        runCatching { gson.fromJson(payload, FriendshipEventDto::class.java) }
+                            .getOrNull()
+                            ?.let { _friendshipEvents.tryEmit(it) }
                     }
 
                     destination.startsWith("/topic/users/") ||

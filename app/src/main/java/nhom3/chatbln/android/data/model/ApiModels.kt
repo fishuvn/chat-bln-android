@@ -106,14 +106,44 @@ data class ConversationItemResponse(
     @SerializedName("lastMessageSenderName") val lastMessageSenderName: String? = null,
     @SerializedName("lastMessageSenderUsername") val lastMessageSenderUsername: String? = null,
     @SerializedName("lastMessageTime") val lastMessageTime: String? = null,
-    @SerializedName("currentUserRole") val currentUserRole: String? = null
+    @SerializedName("currentUserRole") val currentUserRole: String? = null,
+    @SerializedName("memberCount") val memberCount: Int? = null,
+    @SerializedName("members") val members: List<GroupMemberDto>? = null,
+    @SerializedName(value = "isFriend", alternate = ["friend"]) val isFriend: Boolean? = null,
+    @SerializedName("friendshipStatus") val friendshipStatus: String? = null
 ) {
     val isGroup: Boolean
         get() = type.equals("GROUP", ignoreCase = true)
 
     val isCurrentUserGroupAdmin: Boolean
         get() = currentUserRole.equals("ADMIN", ignoreCase = true)
+
+    val isUnfriendedPrivate: Boolean
+        get() = !isGroup && isFriend == false
 }
+
+data class GroupMemberDto(
+    @SerializedName("id") val id: Long,
+    @SerializedName("username") val username: String,
+    @SerializedName("fullName") val fullName: String? = null,
+    @SerializedName("avatarUrl") val avatarUrl: String? = null,
+    @SerializedName("role") val role: String? = null,
+    @SerializedName(value = "isOnline", alternate = ["online"]) val isOnline: Boolean = false,
+    @SerializedName("lastSeen") val lastSeen: String? = null,
+    @SerializedName("joinedAt") val joinedAt: String? = null
+) {
+    val displayName: String
+        get() = fullName?.takeIf { it.isNotBlank() } ?: username
+
+    val isAdmin: Boolean
+        get() = role.equals("ADMIN", ignoreCase = true)
+}
+
+data class FriendshipEventDto(
+    @SerializedName("type") val type: String? = null,
+    @SerializedName("actorUserId") val actorUserId: Long? = null,
+    @SerializedName("targetUserId") val targetUserId: Long? = null
+)
 
 data class DeleteMessagesRequest(
     @SerializedName("messageIds") val messageIds: List<Long>,

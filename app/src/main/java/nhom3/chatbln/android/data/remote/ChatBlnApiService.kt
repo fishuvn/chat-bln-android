@@ -10,6 +10,7 @@ import nhom3.chatbln.android.data.model.DeleteMessagesResponse
 import nhom3.chatbln.android.data.model.FriendRequestDto
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.data.model.FriendshipResponse
+import nhom3.chatbln.android.data.model.GroupMemberDto
 import nhom3.chatbln.android.data.model.LoginRequest
 import nhom3.chatbln.android.data.model.LogoutResponse
 import nhom3.chatbln.android.data.model.MessageDto
@@ -69,6 +70,11 @@ interface ChatBlnApiService {
         @Path("id") conversationId: Long
     ): Map<String, Any>
 
+    @GET("conversations/{id}/members")
+    suspend fun getConversationMembers(
+        @Path("id") conversationId: Long
+    ): List<GroupMemberDto>
+
     @GET("conversations/{id}/messages")
     suspend fun getMessages(
         @Path("id") conversationId: Long,
@@ -115,4 +121,9 @@ interface ChatBlnApiService {
         @Path("id") friendshipId: Long,
         @Body emptyBody: Map<String, String> = emptyMap()
     ): FriendshipResponse
+
+    @DELETE("friends/{targetUserId}")
+    suspend fun unfriend(
+        @Path("targetUserId") targetUserId: Long
+    ): Map<String, Any>
 }

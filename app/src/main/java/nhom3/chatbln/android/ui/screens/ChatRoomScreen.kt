@@ -44,6 +44,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Search
@@ -156,6 +157,9 @@ fun ChatRoomScreen(
     }
 
     val allMessages = uiState.messagesByConversation[conversationId].orEmpty()
+    val groupMembers = uiState.groupMembersByConversation[conversationId]
+        ?: conversation.members.orEmpty()
+    val friendIdSet = remember(uiState.friends) { uiState.friends.map { it.id }.toSet() }
     val hasMore = uiState.hasMoreByConversation[conversationId] == true
 
     LaunchedEffect(allMessages) {
@@ -260,10 +264,50 @@ fun ChatRoomScreen(
         ConversationInfoSheet(
             conversation = conversation,
             messages = allMessages,
+            currentUsername = uiState.currentUser?.username,
+            groupMembers = groupMembers,
+            friendIds = friendIdSet,
             resolveAssetUrl = viewModel::resolveAssetUrl,
             onPreviewImage = { url ->
                 showInfoSheet = false
                 previewImageUrl = url
+            },
+            onUnfriend = conversation.targetUserId?.let { targetId ->
+                {
+                    viewModel.unfriendUser(
+                        targetUserId = targetId,
+                        displayName = conversation.name?.takeIf { it.isNotBlank() } ?: "người dùng"
+                    )
+                }
+            },
+            onReFriend = conversation.targetUserId?.let { targetId ->
+                {
+                    viewModel.sendFriendRequestById(
+                        targetUserId = targetId,
+                        displayName = conversation.name?.takeIf { it.isNotBlank() } ?: "người dùng"
+                    )
+                }
+            },
+            onMessageMember = { member ->
+                showInfoSheet = false
+                viewModel.openOrCreatePrivateChat(
+                    targetUserId = member.id,
+                    fallbackName = member.displayName,
+                    fallbackUsername = member.username,
+                    fallbackAvatarUrl = member.avatarUrl,
+                    fallbackOnline = member.isOnline,
+                    onReady = { nextId ->
+                        if (nextId != conversationId) {
+                            viewModel.openConversation(nextId)
+                        }
+                    }
+                )
+            },
+            onAddFriendMember = { member ->
+                viewModel.sendFriendRequestById(
+                    targetUserId = member.id,
+                    displayName = member.displayName
+                )
             },
             onDeleteConversation = {
                 showInfoSheet = false
@@ -449,7 +493,8 @@ fun ChatRoomScreen(
 
     val roomTitle = conversation.name?.takeIf { it.isNotBlank() } ?: "Hội thoại #$conversationId"
     val roomSubtitle = if (conversation.isGroup) {
-        "Nhóm trò chuyện"
+        val count = groupMembers.size.takeIf { it > 0 } ?: conversation.memberCount ?: 0
+        if (count > 0) "$count thành viên" else "Nhóm trò chuyện"
     } else {
         formatPresenceLabel(conversation.isOnline, conversation.lastSeen)
     }
@@ -643,6 +688,57 @@ fun ChatRoomScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Xóa (${selectedMessageIds.size})")
+                        }
+                    }
+                }
+            } else if (conversation.isUnfriendedPrivate) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Hai bạn hiện không còn là bạn bè. Kết bạn lại để tiếp tục gửi tin nhắn.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        val targetId = conversation.targetUserId
+                        if (conversation.friendshipStatus.equals("PENDING", ignoreCase = true)) {
+                            OutlinedButton(
+                                onClick = {},
+                                enabled = false,
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Text("Đã gửi")
+                            }
+                        } else if (targetId != null) {
+                            Button(
+                                onClick = {
+                                    viewModel.sendFriendRequestById(
+                                        targetUserId = targetId,
+                                        displayName = roomTitle
+                                    )
+                                },
+                                enabled = targetId !in uiState.sendingFriendRequestUserIds,
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.PersonAdd,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Kết bạn lại")
+                            }
                         }
                     }
                 }

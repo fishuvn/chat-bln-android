@@ -25,16 +25,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.PersonRemove
 import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -52,10 +58,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import nhom3.chatbln.android.data.model.ConversationItemResponse
+import nhom3.chatbln.android.data.model.GroupMemberDto
 import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.ui.components.AvatarView
 import nhom3.chatbln.android.ui.util.formatMessageTime
@@ -67,8 +75,15 @@ import nhom3.chatbln.android.ui.util.formatVietnameseDate
 fun ConversationInfoSheet(
     conversation: ConversationItemResponse,
     messages: List<MessageDto>,
+    currentUsername: String? = null,
+    groupMembers: List<GroupMemberDto> = emptyList(),
+    friendIds: Set<Long> = emptySet(),
     resolveAssetUrl: (String?) -> String?,
     onPreviewImage: (String) -> Unit,
+    onUnfriend: (() -> Unit)? = null,
+    onReFriend: (() -> Unit)? = null,
+    onMessageMember: ((GroupMemberDto) -> Unit)? = null,
+    onAddFriendMember: ((GroupMemberDto) -> Unit)? = null,
     onDeleteConversation: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
@@ -76,6 +91,7 @@ fun ConversationInfoSheet(
     val uriHandler = LocalUriHandler.current
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
+    var showUnfriendConfirm by rememberSaveable { mutableStateOf(false) }
     val title = conversation.name?.takeIf { it.isNotBlank() } ?: "Hội thoại #${conversation.id}"
 
     if (showDeleteConfirm && onDeleteConversation != null) {
@@ -101,6 +117,33 @@ fun ConversationInfoSheet(
         )
     }
 
+    if (showUnfriendConfirm && onUnfriend != null) {
+        AlertDialog(
+            onDismissRequest = { showUnfriendConfirm = false },
+            title = { Text("Hủy kết bạn") },
+            text = {
+                Text(
+                    "Hủy kết bạn với \"$title\"? Hai bạn sẽ trở về trạng thái chưa kết bạn và có thể kết bạn lại bất cứ lúc nào."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showUnfriendConfirm = false
+                        onUnfriend()
+                    }
+                ) {
+                    Text("Hủy kết bạn", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnfriendConfirm = false }) {
+                    Text("Đóng")
+                }
+            }
+        )
+    }
+
     val sharedImages = remember(messages) {
         messages.asReversed().mapNotNull { msg ->
             if (msg.attachmentType.equals("IMAGE", ignoreCase = true)) {
@@ -111,11 +154,17 @@ fun ConversationInfoSheet(
         }
     }
 
-        val sharedFilesAndVideos = remember(messages) {
+    val sharedFilesAndVideos = remember(messages) {
         messages.asReversed().filter { msg ->
             val type = msg.attachmentType?.uppercase().orEmpty()
             (type == "FILE" || type == "VIDEO") && !msg.attachmentUrl.isNullOrBlank()
         }
+    }
+
+    val memberTotal = if (groupMembers.isNotEmpty()) {
+        groupMembers.size
+    } else {
+        conversation.memberCount ?: 0
     }
 
     ModalBottomSheet(
@@ -150,7 +199,7 @@ fun ConversationInfoSheet(
                 )
                 Text(
                     text = if (conversation.isGroup) {
-                        "Nhóm trò chuyện"
+                        if (memberTotal > 0) "$memberTotal thành viên" else "Nhóm trò chuyện"
                     } else {
                         val usernamePart = conversation.targetUsername
                             ?.takeIf { it.isNotBlank() }
@@ -170,7 +219,15 @@ fun ConversationInfoSheet(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Thông tin") }
+                    text = {
+                        Text(
+                            if (conversation.isGroup) {
+                                "Thành viên ($memberTotal)"
+                            } else {
+                                "Thông tin"
+                            }
+                        )
+                    }
                 )
                 Tab(
                     selected = selectedTab == 1,
@@ -186,16 +243,153 @@ fun ConversationInfoSheet(
 
             when (selectedTab) {
                 0 -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        if (conversation.isGroup) {
-                            InfoRow(label = "Loại hội thoại", value = "Nhóm trò chuyện chung")
-                            InfoRow(label = "Số tin nhắn đã tải", value = "${messages.size} tin nhắn")
-                        } else {
+                    if (conversation.isGroup) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            if (groupMembers.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(100.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Đang tải danh sách thành viên nhóm...",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 280.dp)
+                                ) {
+                                    items(items = groupMembers, key = { it.id }) { member ->
+                                        val isMe = member.username.equals(currentUsername, ignoreCase = true)
+                                        val isFriend = member.id in friendIds
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            AvatarView(
+                                                displayName = member.displayName,
+                                                avatarUrl = resolveAssetUrl(member.avatarUrl),
+                                                size = 42.dp,
+                                                isOnline = member.isOnline,
+                                                showOnlineBadge = true
+                                            )
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    Text(
+                                                        text = member.displayName,
+                                                        style = MaterialTheme.typography.titleSmall,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    if (isMe) {
+                                                        Text(
+                                                            text = "(Bạn)",
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "@${member.username}",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Surface(
+                                                        color = if (member.isAdmin) {
+                                                            MaterialTheme.colorScheme.primaryContainer
+                                                        } else {
+                                                            MaterialTheme.colorScheme.surfaceContainerHigh
+                                                        },
+                                                        shape = RoundedCornerShape(999.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = if (member.isAdmin) "Quản trị viên" else "Thành viên",
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = if (member.isAdmin) {
+                                                                MaterialTheme.colorScheme.onPrimaryContainer
+                                                            } else {
+                                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                                            },
+                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            if (!isMe) {
+                                                if (isFriend && onMessageMember != null) {
+                                                    IconButton(onClick = { onMessageMember(member) }) {
+                                                        Icon(
+                                                            imageVector = Icons.Outlined.ChatBubbleOutline,
+                                                            contentDescription = "Nhắn tin riêng",
+                                                            tint = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    }
+                                                } else if (!isFriend && onAddFriendMember != null) {
+                                                    IconButton(onClick = { onAddFriendMember(member) }) {
+                                                        Icon(
+                                                            imageVector = Icons.Outlined.PersonAdd,
+                                                            contentDescription = "Kết bạn",
+                                                            tint = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        HorizontalDivider(
+                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (onDeleteConversation != null) {
+                                OutlinedButton(
+                                    onClick = { showDeleteConfirm = true },
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.DeleteOutline,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Xóa lịch sử trò chuyện")
+                                }
+                            }
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
                             InfoRow(
                                 label = "Tên người dùng",
                                 value = conversation.targetUsername?.let { "@$it" } ?: "Chưa cập nhật"
@@ -220,24 +414,66 @@ fun ConversationInfoSheet(
                                 label = "Tiểu sử",
                                 value = conversation.bio?.takeIf { it.isNotBlank() } ?: "Chưa có tiểu sử."
                             )
-                        }
 
-                        if (onDeleteConversation != null) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            OutlinedButton(
-                                onClick = { showDeleteConfirm = true },
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.DeleteOutline,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Xóa lịch sử trò chuyện")
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            if (conversation.isFriend != false && onUnfriend != null) {
+                                OutlinedButton(
+                                    onClick = { showUnfriendConfirm = true },
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.PersonRemove,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Hủy kết bạn")
+                                }
+                            } else if (conversation.isFriend == false) {
+                                if (conversation.friendshipStatus.equals("PENDING", ignoreCase = true)) {
+                                    OutlinedButton(
+                                        onClick = {},
+                                        enabled = false,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Đã gửi lời mời kết bạn")
+                                    }
+                                } else if (onReFriend != null) {
+                                    Button(
+                                        onClick = onReFriend,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.PersonAdd,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Kết bạn lại")
+                                    }
+                                }
+                            }
+
+                            if (onDeleteConversation != null) {
+                                OutlinedButton(
+                                    onClick = { showDeleteConfirm = true },
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.DeleteOutline,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Xóa lịch sử trò chuyện")
+                                }
                             }
                         }
                     }

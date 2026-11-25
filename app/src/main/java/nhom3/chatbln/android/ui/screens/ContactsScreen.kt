@@ -21,8 +21,10 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.PeopleOutline
 import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.PersonRemove
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -61,6 +63,7 @@ fun ContactsScreen(
     onContactsSearchChange: (String) -> Unit,
     onRefresh: () -> Unit,
     onFriendClick: (FriendResponse) -> Unit,
+    onUnfriend: (FriendResponse) -> Unit,
     onUserSearchKeywordChange: (String) -> Unit,
     onExecuteUserSearch: () -> Unit,
     onResetUserSearch: () -> Unit,
@@ -68,6 +71,7 @@ fun ContactsScreen(
     onSendFriendRequest: (UserSearchResponse) -> Unit
 ) {
     var showAddFriendSheet by rememberSaveable { mutableStateOf(false) }
+    var friendPendingUnfriend by remember { mutableStateOf<FriendResponse?>(null) }
 
     val filteredFriends = remember(uiState.friends, uiState.contactsSearchQuery) {
         val query = uiState.contactsSearchQuery.trim()
@@ -82,6 +86,34 @@ fun ContactsScreen(
         base.sortedWith(
             compareByDescending<FriendResponse> { it.isOnline }
                 .thenBy { (it.fullName ?: it.username).lowercase() }
+        )
+    }
+
+    friendPendingUnfriend?.let { target ->
+        val targetName = target.fullName?.takeIf { it.isNotBlank() } ?: target.username
+        AlertDialog(
+            onDismissRequest = { friendPendingUnfriend = null },
+            title = { Text("Hủy kết bạn") },
+            text = {
+                Text(
+                    "Hủy kết bạn với \"$targetName\"? Hai bạn sẽ trở về trạng thái chưa kết bạn và có thể kết bạn lại bất cứ lúc nào."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        friendPendingUnfriend = null
+                        onUnfriend(target)
+                    }
+                ) {
+                    Text("Hủy kết bạn", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { friendPendingUnfriend = null }) {
+                    Text("Đóng")
+                }
+            }
         )
     }
 
@@ -266,6 +298,13 @@ fun ContactsScreen(
                                         imageVector = Icons.Outlined.ChatBubbleOutline,
                                         contentDescription = "Nhắn tin",
                                         tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                IconButton(onClick = { friendPendingUnfriend = friend }) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.PersonRemove,
+                                        contentDescription = "Hủy kết bạn",
+                                        tint = MaterialTheme.colorScheme.error
                                     )
                                 }
                             }

@@ -171,6 +171,12 @@ fun MainScaffoldScreen(
                                 onReady = onOpenConversation
                             )
                         },
+                        onUnfriend = { friend ->
+                            viewModel.unfriendUser(
+                                targetUserId = friend.id,
+                                displayName = friend.fullName?.takeIf { it.isNotBlank() } ?: friend.username
+                            )
+                        },
                         onUserSearchKeywordChange = viewModel::onUserSearchKeywordChange,
                         onExecuteUserSearch = { viewModel.executeUserSearch() },
                         onResetUserSearch = viewModel::resetUserSearch,

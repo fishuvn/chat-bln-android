@@ -22,6 +22,7 @@ import nhom3.chatbln.android.data.model.ConversationItemResponse
 import nhom3.chatbln.android.data.model.DeleteMessagesResponse
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.data.model.FriendshipResponse
+import nhom3.chatbln.android.data.model.GroupMemberDto
 import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.data.model.PresenceEvent
 import nhom3.chatbln.android.data.model.SendMessageRequest
@@ -53,6 +54,7 @@ data class MainChatUiState(
     val conversationSearchQuery: String = "",
     val activeConversationId: Long? = null,
     val messagesByConversation: Map<Long, List<MessageDto>> = emptyMap(),
+    val groupMembersByConversation: Map<Long, List<GroupMemberDto>> = emptyMap(),
     val hasMoreByConversation: Map<Long, Boolean> = emptyMap(),
     val oldestMessageIdByConversation: Map<Long, Long?> = emptyMap(),
     val isMessagesLoading: Boolean = false,
@@ -166,6 +168,16 @@ class MainChatViewModel(
                 applyMessageDeletion(event)
             }
         }
+
+        viewModelScope.launch {
+            stompClient.friendshipEvents.collectLatest {
+                refreshFriendsAndRequests()
+                refreshConversations()
+                if (_uiState.value.hasSearchedUsers && _uiState.value.userSearchKeyword.isNotBlank()) {
+                    executeUserSearch()
+                }
+            }
+        }
     }
 
     fun refreshAll() {
@@ -194,8 +206,15 @@ class MainChatViewModel(
                 onSuccess = { list ->
                     stompClient.syncConversationSubscriptions(list.map { c -> c.id })
                     _uiState.update { state ->
+                        val updatedMembers = state.groupMembersByConversation.toMutableMap()
+                        list.forEach { item ->
+                            if (item.isGroup && !item.members.isNullOrEmpty()) {
+                                updatedMembers[item.id] = item.members
+                            }
+                        }
                         state.copy(
                             conversations = list,
+                            groupMembersByConversation = updatedMembers,
                             isConversationsLoading = false,
                             conversationsError = null
                         )
@@ -275,6 +294,10 @@ class MainChatViewModel(
                 unreadCounts = updatedUnread,
                 inChatSearchQuery = ""
             )
+        }
+
+        if (_uiState.value.conversations.firstOrNull { it.id == conversationId }?.isGroup == true) {
+            loadConversationMembers(conversationId)
         }
 
         viewModelScope.launch {
@@ -762,6 +785,119 @@ class MainChatViewModel(
         }
     }
 
+    fun loadConversationMembers(conversationId: Long) {
+        viewModelScope.launch {
+            repository.getConversationMembers(conversationId).onSuccess { members ->
+                _uiState.update { state ->
+                    val updatedMembers = state.groupMembersByConversation.toMutableMap().apply {
+                        put(conversationId, members)
+                    }
+                    val updatedConvs = state.conversations.map { conv ->
+                        if (conv.id == conversationId) {
+                            conv.copy(memberCount = members.size, members = members)
+                        } else {
+                            conv
+                        }
+                    }
+                    state.copy(
+                        groupMembersByConversation = updatedMembers,
+                        conversations = updatedConvs
+                    )
+                }
+            }
+        }
+    }
+
+    fun unfriendUser(
+        targetUserId: Long,
+        displayName: String,
+        onDone: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            repository.unfriend(targetUserId).fold(
+                onSuccess = {
+                    _uiState.update { state ->
+                        val updatedKnown = state.knownUsersById.toMutableMap()
+                        updatedKnown[targetUserId]?.let { existing ->
+                            updatedKnown[targetUserId] = existing.copy(
+                                isFriend = false,
+                                friendshipStatus = null
+                            )
+                        }
+
+                        val updatedSearchResults = state.userSearchResults.map { item ->
+                            if (item.id == targetUserId) {
+                                item.copy(isFriend = false, friendshipStatus = null)
+                            } else {
+                                item
+                            }
+                        }
+
+                        val updatedConvs = state.conversations.map { conv ->
+                            if (!conv.isGroup && conv.targetUserId == targetUserId) {
+                                conv.copy(isFriend = false, friendshipStatus = null)
+                            } else {
+                                conv
+                            }
+                        }
+
+                        state.copy(
+                            friends = state.friends.filterNot { it.id == targetUserId },
+                            receivedRequests = state.receivedRequests.filterNot { it.requesterId == targetUserId },
+                            sentRequests = state.sentRequests.filterNot { it.addresseeId == targetUserId },
+                            knownUsersById = updatedKnown,
+                            userSearchResults = updatedSearchResults,
+                            conversations = updatedConvs,
+                            snackbarMessage = "Đã hủy kết bạn với $displayName."
+                        )
+                    }
+                    onDone()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(snackbarMessage = err.message ?: "Không thể hủy kết bạn.")
+                    }
+                }
+            )
+        }
+    }
+
+    fun sendFriendRequestById(targetUserId: Long, displayName: String) {
+        if (_uiState.value.sendingFriendRequestUserIds.contains(targetUserId)) return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(sendingFriendRequestUserIds = it.sendingFriendRequestUserIds + targetUserId)
+            }
+            repository.sendFriendRequest(targetUserId).fold(
+                onSuccess = { friendship ->
+                    _uiState.update { state ->
+                        val updatedConvs = state.conversations.map { conv ->
+                            if (!conv.isGroup && conv.targetUserId == targetUserId) {
+                                conv.copy(friendshipStatus = "PENDING")
+                            } else {
+                                conv
+                            }
+                        }
+                        state.copy(
+                            sendingFriendRequestUserIds = state.sendingFriendRequestUserIds - targetUserId,
+                            sentRequests = listOf(friendship) + state.sentRequests.filterNot { it.id == friendship.id },
+                            conversations = updatedConvs,
+                            snackbarMessage = "Đã gửi lời mời kết bạn tới $displayName."
+                        )
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            sendingFriendRequestUserIds = state.sendingFriendRequestUserIds - targetUserId,
+                            snackbarMessage = err.message ?: "Không thể gửi lời mời kết bạn."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
     fun updateProfile(
         fullName: String,
         email: String,
@@ -914,6 +1050,7 @@ class MainChatViewModel(
                         state.copy(
                             conversations = remaining,
                             messagesByConversation = state.messagesByConversation - conversationId,
+                            groupMembersByConversation = state.groupMembersByConversation - conversationId,
                             hasMoreByConversation = state.hasMoreByConversation - conversationId,
                             oldestMessageIdByConversation = state.oldestMessageIdByConversation - conversationId,
                             unreadCounts = state.unreadCounts - conversationId,
@@ -1116,9 +1253,23 @@ class MainChatViewModel(
                 }
             }
 
+            val updatedGroupMembers = state.groupMembersByConversation.mapValues { (_, list) ->
+                list.map { member ->
+                    if (member.id == event.userId) {
+                        member.copy(
+                            isOnline = event.isOnline,
+                            lastSeen = event.lastSeen ?: member.lastSeen
+                        )
+                    } else {
+                        member
+                    }
+                }
+            }
+
             state.copy(
                 conversations = updatedConversations,
-                friends = updatedFriends
+                friends = updatedFriends,
+                groupMembersByConversation = updatedGroupMembers
             )
         }
     }

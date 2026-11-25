@@ -21,6 +21,7 @@ import nhom3.chatbln.android.data.model.DeleteMessagesResponse
 import nhom3.chatbln.android.data.model.FriendRequestDto
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.data.model.FriendshipResponse
+import nhom3.chatbln.android.data.model.GroupMemberDto
 import nhom3.chatbln.android.data.model.LoginRequest
 import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.data.model.MessageHistoryResponse
@@ -145,6 +146,11 @@ class ChatRepository(
         Unit
     }
 
+    suspend fun getConversationMembers(conversationId: Long): Result<List<GroupMemberDto>> =
+        safeApiCall {
+            apiService.getConversationMembers(conversationId)
+        }
+
     suspend fun getMessages(
         conversationId: Long,
         before: Long? = null,
@@ -197,6 +203,11 @@ class ChatRepository(
 
     suspend fun rejectFriendRequest(friendshipId: Long): Result<FriendshipResponse> = safeApiCall {
         apiService.rejectFriendRequest(friendshipId = friendshipId)
+    }
+
+    suspend fun unfriend(targetUserId: Long): Result<Unit> = safeApiCall {
+        apiService.unfriend(targetUserId)
+        Unit
     }
 
     suspend fun uploadFromUri(uri: Uri, fallbackMime: String? = null): Result<UploadResponse> =
