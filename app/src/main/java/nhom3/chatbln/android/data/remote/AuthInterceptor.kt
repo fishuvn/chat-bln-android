@@ -20,6 +20,7 @@ class AuthInterceptor(
 
         val isPublicEndpoint = encodedPath.endsWith("/api/auth/login") ||
             encodedPath.endsWith("/api/auth/register") ||
+            encodedPath.contains("/api/auth/forgot-password/") ||
             encodedPath.endsWith("/api/health")
 
         val token = sessionPreferences.currentToken

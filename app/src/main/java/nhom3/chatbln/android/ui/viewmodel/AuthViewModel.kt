@@ -18,8 +18,14 @@ data class AuthUiState(
     val isAuthenticated: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val serverBaseUrl: String = SessionPreferences.DEFAULT_EMULATOR_BASE_URL,
-    val darkModePreference: Boolean? = null
+    val loginSuccessNotice: String? = null,
+    val forgotStep: Int = 1,
+    val forgotEmail: String = "",
+    val forgotInfoMessage: String? = null,
+    val forgotGeneratedOtp: String? = null,
+    val serverBaseUrl: String = SessionPreferences.DEFAULT_PRODUCTION_BASE_URL,
+    val darkModePreference: Boolean? = null,
+    val dynamicColorEnabled: Boolean = false
 )
 
 class AuthViewModel(
@@ -69,6 +75,12 @@ class AuthViewModel(
         }
 
         viewModelScope.launch {
+            sessionPreferences.dynamicColorFlow.collectLatest { dynamicEnabled ->
+                _uiState.update { it.copy(dynamicColorEnabled = dynamicEnabled) }
+            }
+        }
+
+        viewModelScope.launch {
             container.authInterceptor.unauthorizedEvents.collectLatest {
                 container.stompRealtimeClient.disconnect()
                 sessionPreferences.clearAuthSession()
@@ -86,13 +98,22 @@ class AuthViewModel(
         val cleanUser = username.trim()
         if (cleanUser.isEmpty() || password.isBlank()) {
             _uiState.update {
-                it.copy(errorMessage = "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.")
+                it.copy(
+                    errorMessage = "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.",
+                    loginSuccessNotice = null
+                )
             }
             return
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    errorMessage = null,
+                    loginSuccessNotice = null
+                )
+            }
             val result = repository.login(username = cleanUser, password = password)
             result.fold(
                 onSuccess = {
@@ -100,7 +121,8 @@ class AuthViewModel(
                         it.copy(
                             isLoading = false,
                             isAuthenticated = true,
-                            errorMessage = null
+                            errorMessage = null,
+                            loginSuccessNotice = null
                         )
                     }
                 },
@@ -189,6 +211,184 @@ class AuthViewModel(
         }
     }
 
+    fun requestForgotPasswordOtp(
+        email: String,
+        onOtpIssued: () -> Unit = {}
+    ) {
+        val cleanEmail = email.trim()
+        if (cleanEmail.isEmpty()) {
+            _uiState.update { it.copy(errorMessage = "Vui lòng nhập địa chỉ email đã đăng ký.") }
+            return
+        }
+        if (!Regex("""^[^\s@]+@[^\s@]+\.[^\s@]+$""").matches(cleanEmail)) {
+            _uiState.update { it.copy(errorMessage = "Địa chỉ email không đúng định dạng.") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    errorMessage = null,
+                    forgotInfoMessage = null
+                )
+            }
+            repository.requestPasswordResetOtp(cleanEmail).fold(
+                onSuccess = { resp ->
+                    val targetEmail = resp.email?.takeIf { it.isNotBlank() } ?: cleanEmail
+                    val issuedOtp = resp.otp?.takeIf { it.isNotBlank() }
+                    val info = when {
+                        !issuedOtp.isNullOrBlank() ->
+                            "Mã xác thực 6 chữ số cho $targetEmail: $issuedOtp (hiệu lực 5 phút)."
+                        !resp.message.isNullOrBlank() -> resp.message
+                        else -> "Đã gửi mã xác thực 6 chữ số tới $targetEmail."
+                    }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = null,
+                            forgotStep = 2,
+                            forgotEmail = targetEmail,
+                            forgotInfoMessage = info,
+                            forgotGeneratedOtp = issuedOtp
+                        )
+                    }
+                    onOtpIssued()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = err.message ?: "Không tìm thấy tài khoản gắn với email này."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun verifyForgotPasswordOtp(email: String, otp: String) {
+        val cleanEmail = email.trim().ifEmpty { _uiState.value.forgotEmail }
+        val cleanOtp = otp.trim()
+        if (cleanOtp.length != 6 || !cleanOtp.all { it.isDigit() }) {
+            _uiState.update { it.copy(errorMessage = "Vui lòng nhập đúng mã OTP gồm 6 chữ số.") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            repository.verifyPasswordResetOtp(email = cleanEmail, otp = cleanOtp).fold(
+                onSuccess = {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = null,
+                            forgotStep = 3,
+                            forgotEmail = cleanEmail,
+                            forgotInfoMessage = "Đã xác minh mã OTP. Vui lòng đặt mật khẩu mới."
+                        )
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = err.message ?: "Mã OTP không chính xác hoặc đã hết hạn."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun resetPasswordWithOtp(
+        email: String,
+        otp: String,
+        newPassword: String,
+        confirmPassword: String,
+        onResetSuccess: () -> Unit
+    ) {
+        val cleanEmail = email.trim().ifEmpty { _uiState.value.forgotEmail }
+        val cleanOtp = otp.trim()
+        when {
+            newPassword.isEmpty() || confirmPassword.isEmpty() -> {
+                _uiState.update {
+                    it.copy(errorMessage = "Vui lòng nhập đầy đủ mật khẩu mới và xác nhận.")
+                }
+                return
+            }
+            newPassword.length < 6 -> {
+                _uiState.update {
+                    it.copy(errorMessage = "Mật khẩu mới cần tối thiểu 6 ký tự.")
+                }
+                return
+            }
+            newPassword != confirmPassword -> {
+                _uiState.update {
+                    it.copy(errorMessage = "Mật khẩu xác nhận không trùng khớp.")
+                }
+                return
+            }
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            repository.resetPasswordWithOtp(
+                email = cleanEmail,
+                otp = cleanOtp,
+                newPassword = newPassword
+            ).fold(
+                onSuccess = {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = null,
+                            forgotStep = 1,
+                            forgotInfoMessage = null,
+                            forgotGeneratedOtp = null,
+                            loginSuccessNotice = "Đã đặt lại mật khẩu mới thành công. Bạn có thể đăng nhập ngay."
+                        )
+                    }
+                    onResetSuccess()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = err.message ?: "Không thể cập nhật mật khẩu mới."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun stepBackForgotFlow(): Boolean {
+        val step = _uiState.value.forgotStep
+        return if (step > 1) {
+            _uiState.update {
+                it.copy(
+                    forgotStep = step - 1,
+                    errorMessage = null
+                )
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    fun resetForgotFlow() {
+        _uiState.update {
+            it.copy(
+                forgotStep = 1,
+                forgotInfoMessage = null,
+                forgotGeneratedOtp = null,
+                errorMessage = null
+            )
+        }
+    }
+
     fun updateServerUrl(newUrl: String) {
         viewModelScope.launch {
             val saved = sessionPreferences.setServerBaseUrl(newUrl)
@@ -198,7 +398,7 @@ class AuthViewModel(
     }
 
     fun clearError() {
-        _uiState.update { it.copy(errorMessage = null) }
+        _uiState.update { it.copy(errorMessage = null, loginSuccessNotice = null) }
     }
 
     companion object {

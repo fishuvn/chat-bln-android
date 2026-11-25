@@ -1,12 +1,13 @@
 package nhom3.chatbln.android.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,7 +18,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.ContentPaste
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Public
@@ -44,12 +44,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import nhom3.chatbln.android.data.model.GroupInvitePreviewResponse
+import nhom3.chatbln.android.ui.components.AlertBannerTone
 import nhom3.chatbln.android.ui.components.AvatarView
+import nhom3.chatbln.android.ui.components.InlineAlertBanner
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,7 +84,8 @@ fun JoinGroupBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
@@ -93,7 +98,8 @@ fun JoinGroupBottomSheet(
             Text(
                 text = "Tham gia nhóm bằng link / mã mời",
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() }
             )
 
             Text(
@@ -113,10 +119,13 @@ fun JoinGroupBottomSheet(
                 trailingIcon = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (inviteInput.isNotEmpty()) {
-                            IconButton(onClick = { inviteInput = "" }) {
+                            IconButton(
+                                onClick = { inviteInput = "" },
+                                modifier = Modifier.size(48.dp)
+                            ) {
                                 Icon(
                                     imageVector = Icons.Outlined.Clear,
-                                    contentDescription = "Xóa"
+                                    contentDescription = "Xóa mã mời"
                                 )
                             }
                         } else {
@@ -127,7 +136,8 @@ fun JoinGroupBottomSheet(
                                         inviteInput = pasted
                                         onPreview(pasted)
                                     }
-                                }
+                                },
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.ContentPaste,
@@ -138,7 +148,7 @@ fun JoinGroupBottomSheet(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(
                     onSearch = {
@@ -156,7 +166,9 @@ fun JoinGroupBottomSheet(
                 },
                 enabled = inviteInput.isNotBlank() && !isLoadingPreview && !isJoining,
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
             ) {
                 if (isLoadingPreview) {
                     CircularProgressIndicator(
@@ -177,52 +189,17 @@ fun JoinGroupBottomSheet(
             }
 
             if (!previewError.isNullOrBlank()) {
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.ErrorOutline,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = previewError,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
+                InlineAlertBanner(
+                    message = previewError,
+                    tone = AlertBannerTone.ERROR
+                )
             }
 
             if (!feedbackMessage.isNullOrBlank()) {
-                Surface(
-                    color = if (feedbackIsError) {
-                        MaterialTheme.colorScheme.errorContainer
-                    } else {
-                        MaterialTheme.colorScheme.tertiaryContainer
-                    },
-                    contentColor = if (feedbackIsError) {
-                        MaterialTheme.colorScheme.onErrorContainer
-                    } else {
-                        MaterialTheme.colorScheme.onTertiaryContainer
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = feedbackMessage,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
+                InlineAlertBanner(
+                    message = feedbackMessage,
+                    tone = if (feedbackIsError) AlertBannerTone.ERROR else AlertBannerTone.SUCCESS
+                )
             }
 
             if (preview != null) {
@@ -234,8 +211,9 @@ fun JoinGroupBottomSheet(
                 val isPending = preview.joinStatus.equals("PENDING", ignoreCase = true)
 
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
@@ -331,7 +309,7 @@ fun JoinGroupBottomSheet(
                                     shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(46.dp)
+                                        .heightIn(min = 48.dp)
                                 ) {
                                     Text("Mở nhóm trò chuyện")
                                 }
@@ -344,7 +322,7 @@ fun JoinGroupBottomSheet(
                                     shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(46.dp)
+                                        .heightIn(min = 48.dp)
                                 ) {
                                     Text("Đang chờ phê duyệt")
                                 }
@@ -357,7 +335,7 @@ fun JoinGroupBottomSheet(
                                     shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(46.dp)
+                                        .heightIn(min = 48.dp)
                                 ) {
                                     if (isJoining) {
                                         Box(contentAlignment = Alignment.Center) {

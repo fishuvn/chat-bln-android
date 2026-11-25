@@ -48,6 +48,7 @@ data class MainChatUiState(
     val profile: UserProfileResponse? = null,
     val serverBaseUrl: String = SessionPreferences.DEFAULT_PRODUCTION_BASE_URL,
     val darkModePreference: Boolean? = null,
+    val dynamicColorEnabled: Boolean = false,
     val presenceMode: UserPresenceMode = UserPresenceMode.ONLINE,
     val isWsConnected: Boolean = false,
     val conversations: List<ConversationItemResponse> = emptyList(),
@@ -155,6 +156,12 @@ class MainChatViewModel(
         viewModelScope.launch {
             sessionPreferences.darkModeFlow.collectLatest { darkPref ->
                 _uiState.update { it.copy(darkModePreference = darkPref) }
+            }
+        }
+
+        viewModelScope.launch {
+            sessionPreferences.dynamicColorFlow.collectLatest { dynamicEnabled ->
+                _uiState.update { it.copy(dynamicColorEnabled = dynamicEnabled) }
             }
         }
 
@@ -1640,6 +1647,12 @@ class MainChatViewModel(
     fun setDarkMode(enabled: Boolean) {
         viewModelScope.launch {
             sessionPreferences.setDarkMode(enabled)
+        }
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        viewModelScope.launch {
+            sessionPreferences.setDynamicColor(enabled)
         }
     }
 

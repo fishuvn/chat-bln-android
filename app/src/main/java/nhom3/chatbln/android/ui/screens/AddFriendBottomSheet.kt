@@ -32,19 +32,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import nhom3.chatbln.android.data.model.UserSearchResponse
+import nhom3.chatbln.android.ui.components.AlertBannerTone
 import nhom3.chatbln.android.ui.components.AvatarView
+import nhom3.chatbln.android.ui.components.InlineAlertBanner
+import nhom3.chatbln.android.ui.components.TonalListSkeleton
+import nhom3.chatbln.android.ui.components.resolvePeerPresenceIcon
 import nhom3.chatbln.android.ui.viewmodel.UserRelationshipState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,7 +75,8 @@ fun AddFriendBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
@@ -82,7 +88,8 @@ fun AddFriendBottomSheet(
         ) {
             Text(
                 text = "Tìm và kết bạn",
-                style = MaterialTheme.typography.titleLarge
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.semantics { heading() }
             )
 
             OutlinedTextField(
@@ -94,13 +101,19 @@ fun AddFriendBottomSheet(
                 },
                 trailingIcon = {
                     if (keyword.isNotEmpty()) {
-                        IconButton(onClick = { onKeywordChange("") }) {
-                            Icon(imageVector = Icons.Outlined.Clear, contentDescription = "Xóa")
+                        IconButton(
+                            onClick = { onKeywordChange("") },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Clear,
+                                contentDescription = "Xóa từ khóa tìm kiếm"
+                            )
                         }
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(14.dp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(
                     onSearch = {
@@ -112,26 +125,10 @@ fun AddFriendBottomSheet(
             )
 
             if (!feedbackMessage.isNullOrBlank()) {
-                Surface(
-                    color = if (isFeedbackError) {
-                        MaterialTheme.colorScheme.errorContainer
-                    } else {
-                        MaterialTheme.colorScheme.primaryContainer
-                    },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = feedbackMessage,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isFeedbackError) {
-                            MaterialTheme.colorScheme.onErrorContainer
-                        } else {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        },
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                    )
-                }
+                InlineAlertBanner(
+                    message = feedbackMessage,
+                    tone = if (isFeedbackError) AlertBannerTone.ERROR else AlertBannerTone.SUCCESS
+                )
             }
 
             // Explicitly hide system users until a non-blank search keyword is entered
@@ -147,7 +144,7 @@ fun AddFriendBottomSheet(
                             imageVector = Icons.Outlined.PersonSearch,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(40.dp)
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
@@ -165,14 +162,10 @@ fun AddFriendBottomSheet(
                 }
 
                 isSearching -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(160.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    TonalListSkeleton(
+                        rowCount = 4,
+                        showTrailingAction = true
+                    )
                 }
 
                 hasSearched && results.isEmpty() -> {
@@ -198,16 +191,25 @@ fun AddFriendBottomSheet(
                             .heightIn(max = 340.dp),
                         contentPadding = PaddingValues(vertical = 4.dp)
                     ) {
-                        items(items = results, key = { it.id }) { user ->
+                        items(
+                            items = results,
+                            key = { it.id },
+                            contentType = { "user_search_row" }
+                        ) { user ->
                             val displayName = user.fullName?.takeIf { it.isNotBlank() }
                                 ?: user.username
                             val relationship = resolveRelationship(user)
                             val isSending = sendingUserIds.contains(user.id)
+                            val (peerIcon, peerColor) = resolvePeerPresenceIcon(
+                                isOnline = user.isOnline,
+                                presenceStatus = user.presenceStatus
+                            )
 
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 10.dp),
+                                    .heightIn(min = 60.dp)
+                                    .padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 AvatarView(
@@ -226,11 +228,22 @@ fun AddFriendBottomSheet(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                    Text(
-                                        text = "@${user.username}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = peerIcon,
+                                            contentDescription = null,
+                                            tint = peerColor,
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                        Text(
+                                            text = "@${user.username}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
 
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -248,7 +261,8 @@ fun AddFriendBottomSheet(
                                         OutlinedButton(
                                             onClick = {},
                                             enabled = false,
-                                            shape = RoundedCornerShape(10.dp)
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.heightIn(min = 48.dp)
                                         ) {
                                             Text("Bạn bè")
                                         }
@@ -258,7 +272,8 @@ fun AddFriendBottomSheet(
                                         OutlinedButton(
                                             onClick = {},
                                             enabled = false,
-                                            shape = RoundedCornerShape(10.dp)
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.heightIn(min = 48.dp)
                                         ) {
                                             Text("Đã gửi")
                                         }
@@ -268,7 +283,8 @@ fun AddFriendBottomSheet(
                                         OutlinedButton(
                                             onClick = {},
                                             enabled = false,
-                                            shape = RoundedCornerShape(10.dp)
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.heightIn(min = 48.dp)
                                         ) {
                                             Text("Chờ bạn duyệt")
                                         }
@@ -278,7 +294,8 @@ fun AddFriendBottomSheet(
                                         Button(
                                             onClick = { onSendRequest(user) },
                                             enabled = !isSending,
-                                            shape = RoundedCornerShape(10.dp)
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.heightIn(min = 48.dp)
                                         ) {
                                             if (isSending) {
                                                 CircularProgressIndicator(

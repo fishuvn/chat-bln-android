@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -18,6 +19,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -36,14 +39,15 @@ fun ServerUrlDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Cấu hình địa chỉ máy chủ",
-                style = MaterialTheme.typography.titleLarge
+                text = "Địa chỉ máy chủ",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.semantics { heading() }
             )
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "Mặc định kết nối HTTPS tới https://chat-bln.fishu.io.vn. Khi test cục bộ dùng 10.0.2.2:8088 (máy ảo) hoặc IP LAN của máy tính.",
+                    text = "Mặc định kết nối HTTPS tới chat-bln.fishu.io.vn. Khi kiểm thử cục bộ dùng 10.0.2.2:8088 (máy ảo) hoặc địa chỉ IP LAN.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -63,19 +67,22 @@ fun ServerUrlDialog(
 
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     AssistChip(
                         onClick = { draftUrl = SessionPreferences.DEFAULT_PRODUCTION_BASE_URL },
-                        label = { Text("Cloudflare (chat-bln)") }
+                        label = { Text("Cloudflare HTTPS") },
+                        modifier = Modifier.heightIn(min = 48.dp)
                     )
                     AssistChip(
                         onClick = { draftUrl = SessionPreferences.DEFAULT_EMULATOR_BASE_URL },
-                        label = { Text("Máy ảo (10.0.2.2)") }
+                        label = { Text("Máy ảo 10.0.2.2") },
+                        modifier = Modifier.heightIn(min = 48.dp)
                     )
                     AssistChip(
                         onClick = { draftUrl = "http://192.168.1.10:8088" },
-                        label = { Text("Mẫu LAN Wi-Fi") }
+                        label = { Text("Mạng LAN") },
+                        modifier = Modifier.heightIn(min = 48.dp)
                     )
                 }
             }
@@ -84,13 +91,17 @@ fun ServerUrlDialog(
             TextButton(
                 onClick = {
                     onSave(SessionPreferences.normalizeServerUrl(draftUrl))
-                }
+                },
+                modifier = Modifier.heightIn(min = 48.dp)
             ) {
                 Text("Lưu cấu hình")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
                 Text("Hủy")
             }
         }

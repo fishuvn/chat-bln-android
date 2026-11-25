@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -44,6 +48,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,12 +63,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import nhom3.chatbln.android.data.local.UserPresenceMode
 import nhom3.chatbln.android.ui.components.AvatarView
 import nhom3.chatbln.android.ui.components.ServerUrlDialog
+import nhom3.chatbln.android.ui.components.resolvePresenceVisual
+import nhom3.chatbln.android.ui.theme.isDynamicColorSupported
 import nhom3.chatbln.android.ui.viewmodel.MainChatUiState
 import java.time.Instant
 import java.time.ZoneOffset
@@ -85,6 +94,7 @@ fun ProfileScreen(
         avatarUrl: String?
     ) -> Unit,
     onToggleDarkMode: (Boolean) -> Unit,
+    onToggleDynamicColor: (Boolean) -> Unit = {},
     onChangePresenceMode: (UserPresenceMode) -> Unit,
     onUpdateServerUrl: (String) -> Unit,
     onLogout: () -> Unit
@@ -161,13 +171,17 @@ fun ProfileScreen(
                                 .toString()
                         }
                         showDatePicker = false
-                    }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Text("Chọn")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
+                TextButton(
+                    onClick = { showDatePicker = false },
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
                     Text("Hủy")
                 }
             }
@@ -186,13 +200,17 @@ fun ProfileScreen(
                     onClick = {
                         showLogoutConfirm = false
                         onLogout()
-                    }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Text("Đăng xuất", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showLogoutConfirm = false }) {
+                TextButton(
+                    onClick = { showLogoutConfirm = false },
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
                     Text("Hủy")
                 }
             }
@@ -202,6 +220,7 @@ fun ProfileScreen(
     val username = profile?.username ?: fallback?.username.orEmpty()
     val rawAvatarUrl = profile?.avatarUrl ?: fallback?.avatarUrl
     val genderOptions = listOf("Nam", "Nữ", "Khác")
+    val supportsDynamicColor = isDynamicColorSupported()
 
     Scaffold(
         topBar = {
@@ -209,7 +228,8 @@ fun ProfileScreen(
                 title = {
                     Text(
                         text = "Hồ sơ & Cài đặt",
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics { heading() }
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -222,16 +242,17 @@ fun ProfileScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .imePadding(),
             contentAlignment = Alignment.TopCenter
         ) {
             Column(
                 modifier = Modifier
-                    .widthIn(max = 520.dp)
+                    .widthIn(max = 540.dp)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -270,7 +291,8 @@ fun ProfileScreen(
                                 )
                             },
                             enabled = !uiState.isUploadingAvatar,
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.heightIn(min = 48.dp)
                         ) {
                             if (uiState.isUploadingAvatar) {
                                 CircularProgressIndicator(
@@ -292,35 +314,45 @@ fun ProfileScreen(
                     }
                 }
 
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Trạng thái hoạt động",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.semantics { heading() }
+                    )
 
-                Text(
-                    text = "Trạng thái hoạt động",
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    UserPresenceMode.entries.forEach { mode ->
-                        FilterChip(
-                            selected = uiState.presenceMode == mode,
-                            onClick = { onChangePresenceMode(mode) },
-                            label = { Text(mode.title) }
-                        )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        UserPresenceMode.entries.forEach { mode ->
+                            val visual = resolvePresenceVisual(mode = mode, isWsConnected = true)
+                            FilterChip(
+                                selected = uiState.presenceMode == mode,
+                                onClick = { onChangePresenceMode(mode) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = visual.icon,
+                                        contentDescription = null,
+                                        tint = visual.color,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
+                                label = { Text(mode.shortTitle) },
+                                modifier = Modifier.heightIn(min = 48.dp)
+                            )
+                        }
                     }
                 }
 
                 HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
                 )
 
                 Text(
                     text = "Thông tin cá nhân",
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.semantics { heading() }
                 )
 
                 OutlinedTextField(
@@ -328,6 +360,7 @@ fun ProfileScreen(
                     onValueChange = { fullName = it },
                     label = { Text("Họ và tên hiển thị") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Words
                     ),
@@ -339,6 +372,7 @@ fun ProfileScreen(
                     onValueChange = { email = it },
                     label = { Text("Email") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -348,6 +382,7 @@ fun ProfileScreen(
                     onValueChange = { phone = it },
                     label = { Text("Số điện thoại") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -357,12 +392,16 @@ fun ProfileScreen(
                         text = "Giới tính",
                         style = MaterialTheme.typography.labelLarge
                     )
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         genderOptions.forEach { option ->
                             FilterChip(
                                 selected = gender == option,
                                 onClick = { gender = option },
-                                label = { Text(option) }
+                                label = { Text(option) },
+                                modifier = Modifier.heightIn(min = 48.dp)
                             )
                         }
                     }
@@ -374,7 +413,10 @@ fun ProfileScreen(
                     label = { Text("Ngày sinh (YYYY-MM-DD)") },
                     placeholder = { Text("2003-06-18") },
                     trailingIcon = {
-                        IconButton(onClick = { showDatePicker = true }) {
+                        IconButton(
+                            onClick = { showDatePicker = true },
+                            modifier = Modifier.size(48.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Outlined.CalendarMonth,
                                 contentDescription = "Chọn ngày sinh"
@@ -382,6 +424,7 @@ fun ProfileScreen(
                         }
                     },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -391,6 +434,7 @@ fun ProfileScreen(
                     label = { Text("Tiểu sử") },
                     minLines = 2,
                     maxLines = 4,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -410,7 +454,7 @@ fun ProfileScreen(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .heightIn(min = 48.dp)
                 ) {
                     if (uiState.isSavingProfile) {
                         CircularProgressIndicator(
@@ -424,73 +468,135 @@ fun ProfileScreen(
                 }
 
                 HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
                 )
 
                 Text(
-                    text = "Tùy chọn ứng dụng",
-                    style = MaterialTheme.typography.titleMedium
+                    text = "Giao diện & Kết nối",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.semantics { heading() }
                 )
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.DarkMode,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Giao diện tối",
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                        Text(
-                            text = if (isDarkThemeEffective) "Đang bật chế độ tối" else "Đang bật chế độ sáng",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                        checked = isDarkThemeEffective,
-                        onCheckedChange = onToggleDarkMode
-                    )
-                }
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onToggleDarkMode(!isDarkThemeEffective) }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.DarkMode,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Chế độ tối",
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                Text(
+                                    text = if (isDarkThemeEffective) {
+                                        "Đang dùng nền tối dịu mắt"
+                                    } else {
+                                        "Đang dùng nền sáng tiêu chuẩn"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = isDarkThemeEffective,
+                                onCheckedChange = onToggleDarkMode
+                            )
+                        }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showServerDialog = true }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Dns,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Địa chỉ máy chủ Backend",
-                            style = MaterialTheme.typography.titleSmall
+                        if (supportsDynamicColor) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onToggleDynamicColor(!uiState.dynamicColorEnabled) }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Palette,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Màu động Material You",
+                                        style = MaterialTheme.typography.titleSmall
+                                    )
+                                    Text(
+                                        text = if (uiState.dynamicColorEnabled) {
+                                            "Đồng bộ bảng màu theo hình nền Android 12+"
+                                        } else {
+                                            "Bảng màu Sapphire Quiet Signal mặc định"
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = uiState.dynamicColorEnabled,
+                                    onCheckedChange = onToggleDynamicColor
+                                )
+                            }
+                        }
+
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
-                        Text(
-                            text = uiState.serverBaseUrl,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    TextButton(onClick = { showServerDialog = true }) {
-                        Text("Thay đổi")
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showServerDialog = true }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Dns,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Địa chỉ máy chủ Backend",
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                Text(
+                                    text = uiState.serverBaseUrl,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            TextButton(
+                                onClick = { showServerDialog = true },
+                                modifier = Modifier.heightIn(min = 48.dp)
+                            ) {
+                                Text("Đổi")
+                            }
+                        }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
 
                 OutlinedButton(
                     onClick = { showLogoutConfirm = true },
@@ -500,7 +606,7 @@ fun ProfileScreen(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .heightIn(min = 48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Outlined.Logout,

@@ -5,13 +5,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -22,7 +24,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Dns
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
@@ -36,7 +37,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -50,12 +50,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import nhom3.chatbln.android.ui.components.AlertBannerTone
+import nhom3.chatbln.android.ui.components.InlineAlertBanner
 import nhom3.chatbln.android.ui.components.ServerUrlDialog
 import java.time.Instant
 import java.time.ZoneOffset
@@ -122,13 +126,17 @@ fun RegisterScreen(
                             dob = selectedDate.toString()
                         }
                         showDatePicker = false
-                    }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Text("Chọn")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
+                TextButton(
+                    onClick = { showDatePicker = false },
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
                     Text("Hủy")
                 }
             }
@@ -138,19 +146,32 @@ fun RegisterScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(
-                title = { Text("Tạo tài khoản") },
+                title = {
+                    Text(
+                        text = "Tạo tài khoản",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics { heading() }
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier.size(48.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Quay lại"
+                            contentDescription = "Quay lại đăng nhập"
                         )
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showServerDialog = true }) {
+                    IconButton(
+                        onClick = { showServerDialog = true },
+                        modifier = Modifier.size(48.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Outlined.Dns,
                             contentDescription = "Cấu hình máy chủ"
@@ -186,29 +207,10 @@ fun RegisterScreen(
                 )
 
                 if (!errorMessage.isNullOrBlank()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.ErrorOutline,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = errorMessage,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
+                    InlineAlertBanner(
+                        message = errorMessage,
+                        tone = AlertBannerTone.ERROR
+                    )
                 }
 
                 OutlinedTextField(
@@ -221,6 +223,7 @@ fun RegisterScreen(
                     placeholder = { Text("Ví dụ: Nguyễn Văn An") },
                     singleLine = true,
                     enabled = !isLoading,
+                    shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Words,
                         imeAction = ImeAction.Next
@@ -238,6 +241,7 @@ fun RegisterScreen(
                     placeholder = { Text("Từ 3 đến 50 ký tự") },
                     singleLine = true,
                     enabled = !isLoading,
+                    shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Ascii,
                         imeAction = ImeAction.Next
@@ -254,14 +258,21 @@ fun RegisterScreen(
                     label = { Text("Mật khẩu *") },
                     placeholder = { Text("Tối thiểu 6 ký tự") },
                     trailingIcon = {
-                        IconButton(onClick = { showPassword = !showPassword }) {
+                        IconButton(
+                            onClick = { showPassword = !showPassword },
+                            modifier = Modifier.size(48.dp)
+                        ) {
                             Icon(
                                 imageVector = if (showPassword) {
                                     Icons.Outlined.VisibilityOff
                                 } else {
                                     Icons.Outlined.Visibility
                                 },
-                                contentDescription = null
+                                contentDescription = if (showPassword) {
+                                    "Ẩn mật khẩu"
+                                } else {
+                                    "Hiện mật khẩu"
+                                }
                             )
                         }
                     },
@@ -272,6 +283,7 @@ fun RegisterScreen(
                     },
                     singleLine = true,
                     enabled = !isLoading,
+                    shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Next
@@ -293,6 +305,7 @@ fun RegisterScreen(
                     },
                     singleLine = true,
                     enabled = !isLoading,
+                    shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Next
@@ -303,10 +316,11 @@ fun RegisterScreen(
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
-                    label = { Text("Email") },
+                    label = { Text("Email (dùng để khôi phục mật khẩu)") },
                     placeholder = { Text("ten@domain.com") },
                     singleLine = true,
                     enabled = !isLoading,
+                    shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Email,
                         imeAction = ImeAction.Next
@@ -321,6 +335,7 @@ fun RegisterScreen(
                     placeholder = { Text("0912 345 678") },
                     singleLine = true,
                     enabled = !isLoading,
+                    shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Phone,
                         imeAction = ImeAction.Next
@@ -334,13 +349,17 @@ fun RegisterScreen(
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         genderOptions.forEach { option ->
                             FilterChip(
                                 selected = gender == option,
                                 onClick = { gender = option },
                                 label = { Text(option) },
-                                enabled = !isLoading
+                                enabled = !isLoading,
+                                modifier = Modifier.heightIn(min = 48.dp)
                             )
                         }
                     }
@@ -352,15 +371,19 @@ fun RegisterScreen(
                     label = { Text("Ngày sinh (YYYY-MM-DD)") },
                     placeholder = { Text("2003-06-18") },
                     trailingIcon = {
-                        IconButton(onClick = { showDatePicker = true }) {
+                        IconButton(
+                            onClick = { showDatePicker = true },
+                            modifier = Modifier.size(48.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Outlined.CalendarMonth,
-                                contentDescription = "Chọn ngày sinh"
+                                contentDescription = "Chọn ngày sinh từ lịch"
                             )
                         }
                     },
                     singleLine = true,
                     enabled = !isLoading,
+                    shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Number,
                         imeAction = ImeAction.Next
@@ -376,6 +399,7 @@ fun RegisterScreen(
                     minLines = 2,
                     maxLines = 4,
                     enabled = !isLoading,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -400,7 +424,7 @@ fun RegisterScreen(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .heightIn(min = 50.dp)
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(

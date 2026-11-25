@@ -1,16 +1,19 @@
 package nhom3.chatbln.android.ui.screens
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,7 +33,6 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.UnfoldMore
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,11 +41,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -54,22 +56,24 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import nhom3.chatbln.android.data.local.UserPresenceMode
 import nhom3.chatbln.android.data.model.ConversationItemResponse
 import nhom3.chatbln.android.data.model.FriendResponse
+import nhom3.chatbln.android.ui.components.AlertBannerTone
 import nhom3.chatbln.android.ui.components.AvatarView
-import nhom3.chatbln.android.ui.theme.OnlineIndicatorDark
-import nhom3.chatbln.android.ui.theme.OnlineIndicatorLight
+import nhom3.chatbln.android.ui.components.InlineAlertBanner
+import nhom3.chatbln.android.ui.components.TonalListSkeleton
+import nhom3.chatbln.android.ui.components.resolvePresenceVisual
 import nhom3.chatbln.android.ui.util.formatConversationListTime
 import nhom3.chatbln.android.ui.viewmodel.MainChatUiState
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ConversationsScreen(
     uiState: MainChatUiState,
@@ -87,22 +91,11 @@ fun ConversationsScreen(
     var showNewChatSheet by rememberSaveable { mutableStateOf(false) }
     var showJoinByLinkSheet by rememberSaveable { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
-    val isDarkSurface = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val connectedDotColor = if (isDarkSurface) OnlineIndicatorDark else OnlineIndicatorLight
-    val statusDotColor = when {
-        uiState.presenceMode == UserPresenceMode.OFFLINE -> MaterialTheme.colorScheme.outline
-        !uiState.isWsConnected -> Color(0xFFF59E0B)
-        uiState.presenceMode == UserPresenceMode.ONLINE -> connectedDotColor
-        uiState.presenceMode == UserPresenceMode.IDLE -> Color(0xFFF59E0B)
-        uiState.presenceMode == UserPresenceMode.SLEEP -> Color(0xFF8B5CF6)
-        uiState.presenceMode == UserPresenceMode.DND -> Color(0xFFEF4444)
-        else -> connectedDotColor
-    }
-    val statusLabel = when {
-        uiState.presenceMode == UserPresenceMode.OFFLINE -> "Ẩn trạng thái"
-        !uiState.isWsConnected -> "${uiState.presenceMode.shortTitle} · Đang nối..."
-        else -> uiState.presenceMode.shortTitle
-    }
+
+    val presenceVisual = resolvePresenceVisual(
+        mode = uiState.presenceMode,
+        isWsConnected = uiState.isWsConnected
+    )
 
     val filteredConversations = remember(
         uiState.conversations,
@@ -170,35 +163,44 @@ fun ConversationsScreen(
                 title = {
                     Text(
                         text = "Đoạn chat",
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.semantics { heading() }
                     )
                 },
                 actions = {
                     Box {
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.clickable { showStatusMenu = true }
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant
+                            ),
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .clickable { showStatusMenu = true }
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(9.dp)
-                                        .clip(CircleShape)
-                                        .background(statusDotColor)
+                                Icon(
+                                    imageVector = presenceVisual.icon,
+                                    contentDescription = null,
+                                    tint = presenceVisual.color,
+                                    modifier = Modifier.size(14.dp)
                                 )
                                 Text(
-                                    text = statusLabel,
+                                    text = presenceVisual.label,
                                     style = MaterialTheme.typography.labelLarge,
                                     maxLines = 1
                                 )
                                 Icon(
                                     imageVector = Icons.Outlined.UnfoldMore,
-                                    contentDescription = null,
+                                    contentDescription = "Chọn trạng thái hoạt động",
                                     modifier = Modifier.size(16.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -210,13 +212,22 @@ fun ConversationsScreen(
                             onDismissRequest = { showStatusMenu = false }
                         ) {
                             UserPresenceMode.entries.forEach { mode ->
+                                val itemSpec = resolvePresenceVisual(mode = mode, isWsConnected = true)
                                 DropdownMenuItem(
                                     text = { Text(mode.title) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = itemSpec.icon,
+                                            contentDescription = null,
+                                            tint = itemSpec.color,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
                                     trailingIcon = {
                                         if (uiState.presenceMode == mode) {
                                             Icon(
                                                 imageVector = Icons.Outlined.Check,
-                                                contentDescription = null
+                                                contentDescription = "Đang chọn"
                                             )
                                         }
                                     },
@@ -233,18 +244,22 @@ fun ConversationsScreen(
                         onClick = {
                             onClearInviteDialog()
                             showJoinByLinkSheet = true
-                        }
+                        },
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.GroupAdd,
-                            contentDescription = "Tham gia nhóm bằng link / mã mời"
+                            contentDescription = "Tham gia nhóm bằng link hoặc mã mời"
                         )
                     }
 
-                    IconButton(onClick = onRefresh) {
+                    IconButton(
+                        onClick = onRefresh,
+                        modifier = Modifier.size(48.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Outlined.Refresh,
-                            contentDescription = "Làm mới"
+                            contentDescription = "Làm mới danh sách đoạn chat"
                         )
                     }
                 },
@@ -281,16 +296,19 @@ fun ConversationsScreen(
                 },
                 trailingIcon = {
                     if (uiState.conversationSearchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchQueryChange("") }) {
+                        IconButton(
+                            onClick = { onSearchQueryChange("") },
+                            modifier = Modifier.size(48.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Outlined.Clear,
-                                contentDescription = "Xóa tìm kiếm"
+                                contentDescription = "Xóa từ khóa tìm kiếm"
                             )
                         }
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -298,12 +316,7 @@ fun ConversationsScreen(
 
             when {
                 uiState.isConversationsLoading && uiState.conversations.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    TonalListSkeleton(rowCount = 7)
                 }
 
                 !uiState.conversationsError.isNullOrBlank() && uiState.conversations.isEmpty() -> {
@@ -314,14 +327,16 @@ fun ConversationsScreen(
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = uiState.conversationsError,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.error
+                        InlineAlertBanner(
+                            message = uiState.conversationsError,
+                            tone = AlertBannerTone.ERROR
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(onClick = onRefresh) {
-                            Text("Thử lại")
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onRefresh,
+                            modifier = Modifier.heightIn(min = 48.dp)
+                        ) {
+                            Text("Thử tải lại")
                         }
                     }
                 }
@@ -338,7 +353,7 @@ fun ConversationsScreen(
                             imageVector = Icons.Outlined.Forum,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(48.dp)
+                            modifier = Modifier.size(44.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
@@ -348,29 +363,38 @@ fun ConversationsScreen(
                                 "Không tìm thấy cuộc trò chuyện phù hợp"
                             },
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = if (uiState.conversationSearchQuery.isBlank()) {
-                                "Chọn bạn bè, tạo nhóm mới hoặc tham gia bằng mã mời."
+                                "Bắt đầu trò chuyện mới với bạn bè, tạo nhóm hoặc tham gia nhóm bằng mã mời."
                             } else {
-                                "Hãy thử từ khóa khác."
+                                "Hãy kiểm tra lại từ khóa tìm kiếm."
                             },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
                         )
                         if (uiState.conversationSearchQuery.isBlank()) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = { showNewChatSheet = true }) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { showNewChatSheet = true },
+                                    modifier = Modifier.heightIn(min = 48.dp)
+                                ) {
                                     Text("Bắt đầu trò chuyện")
                                 }
-                                TextButton(
+                                OutlinedButton(
                                     onClick = {
                                         onClearInviteDialog()
                                         showJoinByLinkSheet = true
-                                    }
+                                    },
+                                    modifier = Modifier.heightIn(min = 48.dp)
                                 ) {
                                     Text("Tham gia bằng mã mời")
                                 }
@@ -386,7 +410,10 @@ fun ConversationsScreen(
                     ) {
                         items(
                             items = filteredConversations,
-                            key = { it.id }
+                            key = { it.id },
+                            contentType = {
+                                if (it.isGroup) "group_conversation" else "private_conversation"
+                            }
                         ) { conversation ->
                             val unread = uiState.unreadCounts[conversation.id] ?: 0
                             ConversationRow(
@@ -398,7 +425,7 @@ fun ConversationsScreen(
                             )
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 78.dp, end = 16.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
                             )
                         }
                     }

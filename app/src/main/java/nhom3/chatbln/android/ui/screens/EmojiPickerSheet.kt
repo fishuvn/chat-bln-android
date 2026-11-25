@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +30,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -101,7 +106,8 @@ fun EmojiPickerSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
@@ -113,7 +119,9 @@ fun EmojiPickerSheet(
             Text(
                 text = "Biểu tượng cảm xúc",
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 20.dp)
+                modifier = Modifier
+                    .padding(horizontal = 20.dp)
+                    .semantics { heading() }
             )
 
             ScrollableTabRow(
@@ -125,26 +133,32 @@ fun EmojiPickerSheet(
                     Tab(
                         selected = selectedCategoryIndex == index,
                         onClick = { selectedCategoryIndex = index },
+                        modifier = Modifier.heightIn(min = 48.dp),
                         text = { Text(category.title) }
                     )
                 }
             }
 
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 46.dp),
+                columns = GridCells.Adaptive(minSize = 48.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(260.dp)
+                    .height(264.dp)
             ) {
-                items(activeCategory.emojis) { emoji ->
+                itemsIndexed(
+                    items = activeCategory.emojis,
+                    key = { idx, emoji -> "${selectedCategoryIndex}_${idx}_$emoji" },
+                    contentType = { _, _ -> "emoji_cell" }
+                ) { _, emoji ->
                     Box(
                         modifier = Modifier
-                            .height(44.dp)
+                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .clickable { onEmojiSelected(emoji) },
+                            .clickable { onEmojiSelected(emoji) }
+                            .semantics { contentDescription = "Chèn biểu tượng $emoji" },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(

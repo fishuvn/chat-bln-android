@@ -1,6 +1,7 @@
 package nhom3.chatbln.android.ui.screens
 
 import android.content.Intent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -77,16 +78,21 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import nhom3.chatbln.android.data.model.ConversationItemResponse
 import nhom3.chatbln.android.data.model.GroupJoinRequestDto
 import nhom3.chatbln.android.data.model.GroupMemberDto
 import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.ui.components.AvatarView
+import nhom3.chatbln.android.ui.components.TonalListSkeleton
+import nhom3.chatbln.android.ui.components.resolvePeerPresenceIcon
 import nhom3.chatbln.android.ui.util.buildGroupShareLink
 import nhom3.chatbln.android.ui.util.formatMessageTime
 import nhom3.chatbln.android.ui.util.formatPresenceLabel
@@ -171,20 +177,29 @@ fun ConversationInfoSheet(
 
         AlertDialog(
             onDismissRequest = { showDeleteOrLeaveConfirm = false },
-            title = { Text(dialogTitle) },
+            title = {
+                Text(
+                    text = dialogTitle,
+                    modifier = Modifier.semantics { heading() }
+                )
+            },
             text = { Text(dialogBody) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showDeleteOrLeaveConfirm = false
                         onDeleteConversation()
-                    }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Text(confirmLabel, color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteOrLeaveConfirm = false }) {
+                TextButton(
+                    onClick = { showDeleteOrLeaveConfirm = false },
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
                     Text("Hủy")
                 }
             }
@@ -194,7 +209,12 @@ fun ConversationInfoSheet(
     pendingLeaderCandidate?.let { candidate ->
         AlertDialog(
             onDismissRequest = { pendingLeaderCandidate = null },
-            title = { Text("Chuyển quyền Trưởng nhóm") },
+            title = {
+                Text(
+                    text = "Chuyển quyền Trưởng nhóm",
+                    modifier = Modifier.semantics { heading() }
+                )
+            },
             text = {
                 Text(
                     "Chuyển quyền Trưởng nhóm của \"$title\" cho ${candidate.displayName} (@${candidate.username})? Bạn sẽ trở thành Thành viên của nhóm."
@@ -206,13 +226,17 @@ fun ConversationInfoSheet(
                         val target = candidate
                         pendingLeaderCandidate = null
                         onTransferLeadership?.invoke(target)
-                    }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Text("Xác nhận chuyển quyền")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingLeaderCandidate = null }) {
+                TextButton(
+                    onClick = { pendingLeaderCandidate = null },
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
                     Text("Hủy")
                 }
             }
@@ -222,7 +246,12 @@ fun ConversationInfoSheet(
     if (showUnfriendConfirm && onUnfriend != null) {
         AlertDialog(
             onDismissRequest = { showUnfriendConfirm = false },
-            title = { Text("Hủy kết bạn") },
+            title = {
+                Text(
+                    text = "Hủy kết bạn",
+                    modifier = Modifier.semantics { heading() }
+                )
+            },
             text = {
                 Text(
                     "Hủy kết bạn với \"$title\"? Hai bạn sẽ trở về trạng thái chưa kết bạn và có thể kết bạn lại bất cứ lúc nào."
@@ -233,13 +262,17 @@ fun ConversationInfoSheet(
                     onClick = {
                         showUnfriendConfirm = false
                         onUnfriend()
-                    }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Text("Hủy kết bạn", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showUnfriendConfirm = false }) {
+                TextButton(
+                    onClick = { showUnfriendConfirm = false },
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
                     Text("Đóng")
                 }
             }
@@ -268,10 +301,15 @@ fun ConversationInfoSheet(
     } else {
         conversation.memberCount ?: 0
     }
+    val (peerIcon, peerColor) = resolvePeerPresenceIcon(
+        isOnline = conversation.isOnline,
+        presenceStatus = conversation.presenceStatus
+    )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
@@ -298,32 +336,48 @@ fun ConversationInfoSheet(
                 )
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { heading() }
                 )
-                Text(
-                    text = if (conversation.isGroup) {
-                        if (memberTotal > 0) "$memberTotal thành viên" else "Nhóm trò chuyện"
-                    } else {
+
+                if (conversation.isGroup) {
+                    Text(
+                        text = if (memberTotal > 0) "$memberTotal thành viên" else "Nhóm trò chuyện",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = peerIcon,
+                            contentDescription = null,
+                            tint = peerColor,
+                            modifier = Modifier.size(13.dp)
+                        )
                         val usernamePart = conversation.targetUsername
                             ?.takeIf { it.isNotBlank() }
                             ?.let { "@$it · " }
                             .orEmpty()
-                        usernamePart + formatPresenceLabel(
-                            conversation.isOnline,
-                            conversation.lastSeen,
-                            conversation.presenceStatus
+                        Text(
+                            text = usernamePart + formatPresenceLabel(
+                                conversation.isOnline,
+                                conversation.lastSeen,
+                                conversation.presenceStatus
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                    }
+                }
 
                 if (conversation.isGroup) {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // Group visibility badge
                         Surface(
                             color = if (conversation.isPrivateGroup) {
                                 MaterialTheme.colorScheme.secondaryContainer
@@ -364,10 +418,8 @@ fun ConversationInfoSheet(
                             }
                         }
 
-                        // Caller's role badge
                         GroupRoleBadge(role = effectiveCurrentRole)
 
-                        // Pending join requests badge
                         if (canManageInvitesAndApprovals && effectivePendingCount > 0) {
                             Surface(
                                 color = MaterialTheme.colorScheme.errorContainer,
@@ -393,6 +445,7 @@ fun ConversationInfoSheet(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
+                    modifier = Modifier.heightIn(min = 48.dp),
                     text = {
                         Text(
                             if (conversation.isGroup) {
@@ -406,11 +459,13 @@ fun ConversationInfoSheet(
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
+                    modifier = Modifier.heightIn(min = 48.dp),
                     text = { Text("Ảnh (${sharedImages.size})") }
                 )
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
+                    modifier = Modifier.heightIn(min = 48.dp),
                     text = { Text("Tệp & Video (${sharedFilesAndVideos.size})") }
                 )
             }
@@ -509,7 +564,10 @@ fun ConversationInfoSheet(
                                     colors = ButtonDefaults.outlinedButtonColors(
                                         contentColor = MaterialTheme.colorScheme.error
                                     ),
-                                    modifier = Modifier.fillMaxWidth()
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 48.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.PersonRemove,
@@ -524,14 +582,20 @@ fun ConversationInfoSheet(
                                     OutlinedButton(
                                         onClick = {},
                                         enabled = false,
-                                        modifier = Modifier.fillMaxWidth()
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 48.dp)
                                     ) {
                                         Text("Đã gửi lời mời kết bạn")
                                     }
                                 } else if (onReFriend != null) {
                                     Button(
                                         onClick = onReFriend,
-                                        modifier = Modifier.fillMaxWidth()
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 48.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.PersonAdd,
@@ -550,7 +614,10 @@ fun ConversationInfoSheet(
                                     colors = ButtonDefaults.outlinedButtonColors(
                                         contentColor = MaterialTheme.colorScheme.error
                                     ),
-                                    modifier = Modifier.fillMaxWidth()
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 48.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.DeleteOutline,
@@ -589,10 +656,22 @@ fun ConversationInfoSheet(
                                 .fillMaxWidth()
                                 .heightIn(max = 340.dp)
                         ) {
-                            items(sharedImages) { imageUrl ->
+                            itemsIndexed(
+                                items = sharedImages,
+                                key = { index, imageUrl -> "${index}_$imageUrl" },
+                                contentType = { _, _ -> "shared_image" }
+                            ) { _, imageUrl ->
+                                val imageRequest = remember(imageUrl, context) {
+                                    ImageRequest.Builder(context)
+                                        .data(imageUrl)
+                                        .memoryCacheKey(imageUrl)
+                                        .diskCacheKey(imageUrl)
+                                        .crossfade(false)
+                                        .build()
+                                }
                                 AsyncImage(
-                                    model = imageUrl,
-                                    contentDescription = "Ảnh chia sẻ",
+                                    model = imageRequest,
+                                    contentDescription = "Mở ảnh chia sẻ",
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -627,12 +706,17 @@ fun ConversationInfoSheet(
                                 .heightIn(max = 340.dp),
                             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp)
                         ) {
-                            items(items = sharedFilesAndVideos, key = { it.id }) { msg ->
+                            items(
+                                items = sharedFilesAndVideos,
+                                key = { it.id },
+                                contentType = { it.attachmentType ?: "FILE" }
+                            ) { msg ->
                                 val isVideo = msg.attachmentType.equals("VIDEO", ignoreCase = true)
                                 val url = resolveAssetUrl(msg.attachmentUrl)
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .heightIn(min = 56.dp)
                                         .clickable(enabled = !url.isNullOrBlank()) {
                                             url?.let { runCatching { uriHandler.openUri(it) } }
                                         }
@@ -672,13 +756,13 @@ fun ConversationInfoSheet(
                                     }
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
-                                        contentDescription = "Mở",
+                                        contentDescription = "Mở tệp",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
                                 HorizontalDivider(
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                                 )
                             }
                         }
@@ -728,23 +812,28 @@ private fun GroupManagementTabContent(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // 1. Share Invite Link + Visibility Section
-        item(key = "invite_and_visibility_section") {
+        item(
+            key = "invite_and_visibility_section",
+            contentType = "invite_section"
+        ) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     text = "Liên kết mời tham gia nhóm",
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.semantics { heading() }
                 )
 
                 if (inviteLink != null) {
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
                             modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
                                 text = inviteLink,
@@ -762,7 +851,8 @@ private fun GroupManagementTabContent(
                                 OutlinedButton(
                                     onClick = { onCopyInviteLink(inviteLink) },
                                     shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier.heightIn(min = 48.dp)
                                 ) {
                                     Icon(
                                         imageVector = if (copiedInviteFeedback) {
@@ -780,7 +870,8 @@ private fun GroupManagementTabContent(
                                 OutlinedButton(
                                     onClick = { onShareInviteLink(inviteLink) },
                                     shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier.heightIn(min = 48.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.Share,
@@ -796,7 +887,8 @@ private fun GroupManagementTabContent(
                                         onClick = onRegenerateInviteCode,
                                         enabled = !isUpdatingGroupSettings,
                                         shape = RoundedCornerShape(10.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                        modifier = Modifier.heightIn(min = 48.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.Refresh,
@@ -820,7 +912,8 @@ private fun GroupManagementTabContent(
                         OutlinedButton(
                             onClick = onRegenerateInviteCode,
                             enabled = !isUpdatingGroupSettings,
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.heightIn(min = 48.dp)
                         ) {
                             Text("Tạo liên kết mời cho \"$groupTitle\"")
                         }
@@ -828,13 +921,16 @@ private fun GroupManagementTabContent(
                 }
 
                 if (isGroupAdmin && onUpdateGroupVisibility != null) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
                             text = "Chế độ nhóm (Trưởng nhóm)",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             FilterChip(
                                 selected = !conversation.isPrivateGroup,
                                 onClick = {
@@ -850,7 +946,8 @@ private fun GroupManagementTabContent(
                                         contentDescription = null,
                                         modifier = Modifier.size(16.dp)
                                     )
-                                }
+                                },
+                                modifier = Modifier.heightIn(min = 48.dp)
                             )
                             FilterChip(
                                 selected = conversation.isPrivateGroup,
@@ -867,30 +964,38 @@ private fun GroupManagementTabContent(
                                         contentDescription = null,
                                         modifier = Modifier.size(16.dp)
                                     )
-                                }
+                                },
+                                modifier = Modifier.heightIn(min = 48.dp)
                             )
                         }
                     }
                 }
 
                 HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
                 )
             }
         }
 
         // 2. Pending Join Requests Section (for ADMIN & DEPUTY)
         if (canManageInvitesAndApprovals && (conversation.isPrivateGroup || joinRequests.isNotEmpty())) {
-            item(key = "pending_join_requests_header") {
+            item(
+                key = "pending_join_requests_header",
+                contentType = "section_header"
+            ) {
                 Text(
                     text = "Yêu cầu tham gia chờ duyệt (${joinRequests.size})",
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.semantics { heading() }
                 )
             }
 
             if (joinRequests.isEmpty()) {
-                item(key = "pending_join_requests_empty") {
+                item(
+                    key = "pending_join_requests_empty",
+                    contentType = "empty_notice"
+                ) {
                     Text(
                         text = "Không có yêu cầu tham gia nào đang chờ phê duyệt.",
                         style = MaterialTheme.typography.bodySmall,
@@ -900,7 +1005,8 @@ private fun GroupManagementTabContent(
             } else {
                 items(
                     items = joinRequests,
-                    key = { "join_req_${it.id}" }
+                    key = { "join_req_${it.id}" },
+                    contentType = { "join_request" }
                 ) { req ->
                     val isProcessing = processingJoinRequestIds.contains(req.id)
                     val timeLabel = formatMessageTime(req.createdAt)
@@ -944,7 +1050,8 @@ private fun GroupManagementTabContent(
                                 onClick = { onRejectJoinRequest?.invoke(req) },
                                 enabled = !isProcessing,
                                 shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                modifier = Modifier.heightIn(min = 48.dp)
                             ) {
                                 Text("Từ chối")
                             }
@@ -952,13 +1059,14 @@ private fun GroupManagementTabContent(
                                 onClick = { onApproveJoinRequest?.invoke(req) },
                                 enabled = !isProcessing,
                                 shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                modifier = Modifier.heightIn(min = 48.dp)
                             ) {
                                 if (isProcessing) {
                                     CircularProgressIndicator(
                                         strokeWidth = 2.dp,
                                         color = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(15.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 } else {
                                     Text("Duyệt")
@@ -966,7 +1074,7 @@ private fun GroupManagementTabContent(
                             }
                         }
                         HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
                         )
                     }
                 }
@@ -974,43 +1082,45 @@ private fun GroupManagementTabContent(
         }
 
         // 3. Members List Section
-        item(key = "members_header") {
+        item(
+            key = "members_header",
+            contentType = "section_header"
+        ) {
             Text(
                 text = "Danh sách thành viên (${groupMembers.size})",
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() }
             )
         }
 
         if (groupMembers.isEmpty()) {
-            item(key = "members_loading") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(72.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Đang tải danh sách thành viên nhóm...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            item(
+                key = "members_loading",
+                contentType = "skeleton"
+            ) {
+                TonalListSkeleton(rowCount = 3)
             }
         } else {
             items(
                 items = groupMembers,
-                key = { "member_${it.id}" }
+                key = { "member_${it.id}" },
+                contentType = { "group_member" }
             ) { member ->
                 val isMe = member.username.equals(currentUsername, ignoreCase = true)
                 val isFriend = member.id in friendIds
                 val isBusy = processingMemberIds.contains(member.id)
                 var showRoleMenu by remember { mutableStateOf(false) }
+                val (memberIcon, memberColor) = resolvePeerPresenceIcon(
+                    isOnline = member.isOnline,
+                    presenceStatus = member.presenceStatus
+                )
 
                 Column {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .heightIn(min = 56.dp)
                             .padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1046,6 +1156,12 @@ private fun GroupManagementTabContent(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
+                                Icon(
+                                    imageVector = memberIcon,
+                                    contentDescription = null,
+                                    tint = memberColor,
+                                    modifier = Modifier.size(11.dp)
+                                )
                                 Text(
                                     text = "@${member.username}",
                                     style = MaterialTheme.typography.bodySmall,
@@ -1059,28 +1175,35 @@ private fun GroupManagementTabContent(
 
                         if (!isMe) {
                             if (isFriend && onMessageMember != null) {
-                                IconButton(onClick = { onMessageMember(member) }) {
+                                IconButton(
+                                    onClick = { onMessageMember(member) },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
                                     Icon(
                                         imageVector = Icons.Outlined.ChatBubbleOutline,
-                                        contentDescription = "Nhắn tin riêng",
+                                        contentDescription = "Nhắn tin riêng với ${member.displayName}",
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
                             } else if (!isFriend && onAddFriendMember != null) {
-                                IconButton(onClick = { onAddFriendMember(member) }) {
+                                IconButton(
+                                    onClick = { onAddFriendMember(member) },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
                                     Icon(
                                         imageVector = Icons.Outlined.PersonAdd,
-                                        contentDescription = "Kết bạn",
+                                        contentDescription = "Kết bạn với ${member.displayName}",
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
                             }
 
-                            if (isGroupAdmin && (onUpdateMemberRole != null || true)) {
+                            if (isGroupAdmin) {
                                 Box {
                                     IconButton(
                                         onClick = { showRoleMenu = true },
-                                        enabled = !isBusy
+                                        enabled = !isBusy,
+                                        modifier = Modifier.size(48.dp)
                                     ) {
                                         if (isBusy) {
                                             CircularProgressIndicator(
@@ -1090,7 +1213,7 @@ private fun GroupManagementTabContent(
                                         } else {
                                             Icon(
                                                 imageVector = Icons.Outlined.MoreVert,
-                                                contentDescription = "Quản lý vai trò"
+                                                contentDescription = "Quản lý vai trò của ${member.displayName}"
                                             )
                                         }
                                     }
@@ -1140,7 +1263,7 @@ private fun GroupManagementTabContent(
                         }
                     }
                     HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
                     )
                 }
             }
@@ -1148,14 +1271,20 @@ private fun GroupManagementTabContent(
 
         // 4. Dissolve / Leave Group Danger Button
         if (onDangerAction != null) {
-            item(key = "group_danger_button") {
+            item(
+                key = "group_danger_button",
+                contentType = "danger_action"
+            ) {
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedButton(
                     onClick = onDangerAction,
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
                 ) {
                     Icon(
                         imageVector = if (isGroupAdmin) {
@@ -1224,7 +1353,7 @@ private fun InfoRow(label: String, value: String) {
         )
         Spacer(modifier = Modifier.height(4.dp))
         HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
         )
     }
 }

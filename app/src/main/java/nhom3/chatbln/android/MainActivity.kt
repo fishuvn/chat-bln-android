@@ -23,6 +23,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import nhom3.chatbln.android.ui.screens.ChatRoomScreen
+import nhom3.chatbln.android.ui.screens.ForgotPasswordScreen
 import nhom3.chatbln.android.ui.screens.LoginScreen
 import nhom3.chatbln.android.ui.screens.MainScaffoldScreen
 import nhom3.chatbln.android.ui.screens.RegisterScreen
@@ -50,7 +51,10 @@ class MainActivity : ComponentActivity() {
             val systemDark = isSystemInDarkTheme()
             val isDarkEffective = authState.darkModePreference ?: systemDark
 
-            ChatBlnTheme(darkTheme = isDarkEffective) {
+            ChatBlnTheme(
+                darkTheme = isDarkEffective,
+                dynamicColor = authState.dynamicColorEnabled
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -79,6 +83,7 @@ class MainActivity : ComponentActivity() {
 private object Routes {
     const val LOGIN = "login"
     const val REGISTER = "register"
+    const val FORGOT_PASSWORD = "forgot_password"
     const val MAIN = "main"
     const val CHAT_ROOM = "chat/{conversationId}"
 
@@ -97,14 +102,18 @@ private fun ChatBlnRootNavHost(
 
     LaunchedEffect(isAuthenticated) {
         val currentRoute = navController.currentDestination?.route
+        val isAuthRoute = currentRoute == Routes.LOGIN ||
+            currentRoute == Routes.REGISTER ||
+            currentRoute == Routes.FORGOT_PASSWORD
+
         if (isAuthenticated) {
-            if (currentRoute == Routes.LOGIN || currentRoute == Routes.REGISTER) {
+            if (isAuthRoute) {
                 navController.navigate(Routes.MAIN) {
                     popUpTo(0) { inclusive = true }
                 }
             }
         } else {
-            if (currentRoute != null && currentRoute != Routes.LOGIN && currentRoute != Routes.REGISTER) {
+            if (currentRoute != null && !isAuthRoute) {
                 navController.navigate(Routes.LOGIN) {
                     popUpTo(0) { inclusive = true }
                 }
@@ -120,11 +129,16 @@ private fun ChatBlnRootNavHost(
             LoginScreen(
                 isLoading = authState.isLoading,
                 errorMessage = authState.errorMessage,
+                successNotice = authState.loginSuccessNotice,
                 serverBaseUrl = authState.serverBaseUrl,
                 onLogin = authViewModel::login,
                 onNavigateToRegister = {
                     authViewModel.clearError()
                     navController.navigate(Routes.REGISTER)
+                },
+                onNavigateToForgotPassword = {
+                    authViewModel.resetForgotFlow()
+                    navController.navigate(Routes.FORGOT_PASSWORD)
                 },
                 onUpdateServerUrl = authViewModel::updateServerUrl,
                 onClearError = authViewModel::clearError
@@ -140,6 +154,39 @@ private fun ChatBlnRootNavHost(
                 onNavigateBack = {
                     authViewModel.clearError()
                     navController.popBackStack()
+                },
+                onUpdateServerUrl = authViewModel::updateServerUrl,
+                onClearError = authViewModel::clearError
+            )
+        }
+
+        composable(Routes.FORGOT_PASSWORD) {
+            ForgotPasswordScreen(
+                currentStep = authState.forgotStep,
+                savedEmail = authState.forgotEmail,
+                isLoading = authState.isLoading,
+                errorMessage = authState.errorMessage,
+                infoMessage = authState.forgotInfoMessage,
+                generatedOtpHint = authState.forgotGeneratedOtp,
+                serverBaseUrl = authState.serverBaseUrl,
+                onSendOtp = authViewModel::requestForgotPasswordOtp,
+                onVerifyOtp = authViewModel::verifyForgotPasswordOtp,
+                onResetPassword = { email, otp, newPass, confirmPass ->
+                    authViewModel.resetPasswordWithOtp(
+                        email = email,
+                        otp = otp,
+                        newPassword = newPass,
+                        confirmPassword = confirmPass,
+                        onResetSuccess = {
+                            navController.popBackStack()
+                        }
+                    )
+                },
+                onStepBack = {
+                    if (!authViewModel.stepBackForgotFlow()) {
+                        authViewModel.resetForgotFlow()
+                        navController.popBackStack()
+                    }
                 },
                 onUpdateServerUrl = authViewModel::updateServerUrl,
                 onClearError = authViewModel::clearError

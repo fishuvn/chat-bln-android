@@ -2,7 +2,6 @@ package nhom3.chatbln.android.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,7 +25,7 @@ import androidx.compose.material.icons.outlined.PersonRemove
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -46,11 +46,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.data.model.UserSearchResponse
 import nhom3.chatbln.android.ui.components.AvatarView
+import nhom3.chatbln.android.ui.components.TonalListSkeleton
+import nhom3.chatbln.android.ui.components.resolvePeerPresenceIcon
 import nhom3.chatbln.android.ui.util.formatPresenceLabel
 import nhom3.chatbln.android.ui.viewmodel.MainChatUiState
 import nhom3.chatbln.android.ui.viewmodel.UserRelationshipState
@@ -104,13 +109,17 @@ fun ContactsScreen(
                     onClick = {
                         friendPendingUnfriend = null
                         onUnfriend(target)
-                    }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Text("Hủy kết bạn", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { friendPendingUnfriend = null }) {
+                TextButton(
+                    onClick = { friendPendingUnfriend = null },
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
                     Text("Đóng")
                 }
             }
@@ -144,11 +153,15 @@ fun ContactsScreen(
                 title = {
                     Text(
                         text = "Danh bạ (${uiState.friends.size})",
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics { heading() }
                     )
                 },
                 actions = {
-                    IconButton(onClick = onRefresh) {
+                    IconButton(
+                        onClick = onRefresh,
+                        modifier = Modifier.size(48.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Outlined.Refresh,
                             contentDescription = "Làm mới danh bạ"
@@ -188,7 +201,10 @@ fun ContactsScreen(
                 },
                 trailingIcon = {
                     if (uiState.contactsSearchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onContactsSearchChange("") }) {
+                        IconButton(
+                            onClick = { onContactsSearchChange("") },
+                            modifier = Modifier.size(48.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Outlined.Clear,
                                 contentDescription = "Xóa từ khóa"
@@ -197,7 +213,7 @@ fun ContactsScreen(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -205,12 +221,7 @@ fun ContactsScreen(
 
             when {
                 uiState.isFriendsLoading && uiState.friends.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    TonalListSkeleton(rowCount = 6, showTrailingAction = true)
                 }
 
                 filteredFriends.isEmpty() -> {
@@ -225,7 +236,7 @@ fun ContactsScreen(
                             imageVector = Icons.Outlined.PeopleOutline,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(48.dp)
+                            modifier = Modifier.size(44.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
@@ -234,18 +245,23 @@ fun ContactsScreen(
                             } else {
                                 "Không tìm thấy người bạn nào khớp từ khóa"
                             },
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Nhấn nút Thêm bạn để tìm kiếm theo tên hoặc @username.",
+                            text = "Tìm kiếm bạn bè theo họ tên hoặc @username để kết nối và nhắn tin.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
                         )
                         if (uiState.contactsSearchQuery.isBlank()) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            TextButton(onClick = { showAddFriendSheet = true }) {
-                                Text("Tìm bạn bè mới")
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(
+                                onClick = { showAddFriendSheet = true },
+                                modifier = Modifier.heightIn(min = 48.dp)
+                            ) {
+                                Text("Thêm bạn bè")
                             }
                         }
                     }
@@ -256,9 +272,23 @@ fun ContactsScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 88.dp)
                     ) {
-                        items(items = filteredFriends, key = { it.id }) { friend ->
+                        items(
+                            items = filteredFriends,
+                            key = { it.id },
+                            contentType = { "contact_row" }
+                        ) { friend ->
                             val displayName = friend.fullName?.takeIf { it.isNotBlank() }
                                 ?: friend.username
+                            val (statusIcon, statusColor) = resolvePeerPresenceIcon(
+                                isOnline = friend.isOnline,
+                                presenceStatus = friend.presenceStatus
+                            )
+                            val presenceText = formatPresenceLabel(
+                                friend.isOnline,
+                                friend.lastSeen,
+                                friend.presenceStatus
+                            )
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -275,45 +305,59 @@ fun ContactsScreen(
                                     showOnlineBadge = true
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
                                     Text(
                                         text = displayName,
                                         style = MaterialTheme.typography.titleMedium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                    Text(
-                                        text = "@${friend.username} · ${
-                                            formatPresenceLabel(friend.isOnline, friend.lastSeen, friend.presenceStatus)
-                                        }",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (friend.isOnline) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = statusIcon,
+                                            contentDescription = null,
+                                            tint = statusColor,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Text(
+                                            text = "@${friend.username} · $presenceText",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
-                                IconButton(onClick = { onFriendClick(friend) }) {
+                                IconButton(
+                                    onClick = { onFriendClick(friend) },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
                                     Icon(
                                         imageVector = Icons.Outlined.ChatBubbleOutline,
-                                        contentDescription = "Nhắn tin",
+                                        contentDescription = "Nhắn tin với $displayName",
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
-                                IconButton(onClick = { friendPendingUnfriend = friend }) {
+                                IconButton(
+                                    onClick = { friendPendingUnfriend = friend },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
                                     Icon(
                                         imageVector = Icons.Outlined.PersonRemove,
-                                        contentDescription = "Hủy kết bạn",
+                                        contentDescription = "Hủy kết bạn với $displayName",
                                         tint = MaterialTheme.colorScheme.error
                                     )
                                 }
                             }
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 76.dp, end = 16.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
                             )
                         }
                     }

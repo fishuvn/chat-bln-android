@@ -46,10 +46,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.ui.components.AvatarView
+import nhom3.chatbln.android.ui.components.resolvePeerPresenceIcon
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -83,7 +86,8 @@ fun NewChatBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
@@ -96,7 +100,8 @@ fun NewChatBottomSheet(
             Text(
                 text = if (isGroupMode) "Tạo nhóm trò chuyện mới" else "Bắt đầu cuộc trò chuyện",
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() }
             )
 
             FlowRow(
@@ -113,7 +118,8 @@ fun NewChatBottomSheet(
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
-                    }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 )
                 FilterChip(
                     selected = isGroupMode,
@@ -125,7 +131,8 @@ fun NewChatBottomSheet(
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
-                    }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 )
                 AssistChip(
                     onClick = onOpenJoinByInvite,
@@ -136,7 +143,8 @@ fun NewChatBottomSheet(
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
-                    }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 )
             }
 
@@ -147,6 +155,7 @@ fun NewChatBottomSheet(
                     label = { Text("Tên nhóm *") },
                     placeholder = { Text("Ví dụ: Nhóm Đồ Án Android") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -156,7 +165,10 @@ fun NewChatBottomSheet(
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         FilterChip(
                             selected = groupVisibility == "PUBLIC",
                             onClick = { groupVisibility = "PUBLIC" },
@@ -167,7 +179,8 @@ fun NewChatBottomSheet(
                                     contentDescription = null,
                                     modifier = Modifier.size(17.dp)
                                 )
-                            }
+                            },
+                            modifier = Modifier.heightIn(min = 48.dp)
                         )
                         FilterChip(
                             selected = groupVisibility == "PRIVATE",
@@ -179,7 +192,8 @@ fun NewChatBottomSheet(
                                     contentDescription = null,
                                     modifier = Modifier.size(17.dp)
                                 )
-                            }
+                            },
+                            modifier = Modifier.heightIn(min = 48.dp)
                         )
                     }
                     Text(
@@ -211,7 +225,7 @@ fun NewChatBottomSheet(
                         Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -248,13 +262,22 @@ fun NewChatBottomSheet(
                         .heightIn(max = 260.dp),
                     contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
-                    items(items = filteredFriends, key = { it.id }) { friend ->
+                    items(
+                        items = filteredFriends,
+                        key = { it.id },
+                        contentType = { "friend_picker_row" }
+                    ) { friend ->
                         val isChecked = selectedMemberIds.contains(friend.id)
                         val displayName = friend.fullName?.takeIf { it.isNotBlank() } ?: friend.username
+                        val (peerIcon, peerColor) = resolvePeerPresenceIcon(
+                            isOnline = friend.isOnline,
+                            presenceStatus = friend.presenceStatus
+                        )
 
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .heightIn(min = 56.dp)
                                 .clickable(enabled = !isSubmitting) {
                                     if (isGroupMode) {
                                         if (isChecked) {
@@ -266,7 +289,7 @@ fun NewChatBottomSheet(
                                         onSelectFriendForPrivateChat(friend)
                                     }
                                 }
-                                .padding(vertical = 10.dp),
+                                .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             AvatarView(
@@ -285,11 +308,22 @@ fun NewChatBottomSheet(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Text(
-                                    text = "@${friend.username}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = peerIcon,
+                                        contentDescription = null,
+                                        tint = peerColor,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Text(
+                                        text = "@${friend.username}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                             if (isGroupMode) {
                                 Checkbox(
@@ -326,7 +360,7 @@ fun NewChatBottomSheet(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .heightIn(min = 48.dp)
                 ) {
                     Text(
                         if (selectedMemberIds.isEmpty()) {

@@ -1,7 +1,15 @@
 package nhom3.chatbln.android.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
@@ -14,14 +22,18 @@ import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,7 +43,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import nhom3.chatbln.android.ui.components.QuietSignalBrandMark
 import nhom3.chatbln.android.ui.viewmodel.MainChatViewModel
 
 private enum class MainTab(
@@ -72,6 +86,10 @@ fun MainScaffoldScreen(
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.CONVERSATIONS) }
     val snackbarHostState = remember { SnackbarHostState() }
 
+    BackHandler(enabled = selectedTab != MainTab.CONVERSATIONS) {
+        selectedTab = MainTab.CONVERSATIONS
+    }
+
     LaunchedEffect(uiState.snackbarMessage) {
         val message = uiState.snackbarMessage
         if (!message.isNullOrBlank()) {
@@ -80,157 +98,237 @@ fun MainScaffoldScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            ) {
-                MainTab.entries.forEach { tab ->
-                    val isSelected = selectedTab == tab
-                    val badgeCount = when (tab) {
-                        MainTab.CONVERSATIONS -> uiState.totalUnreadCount
-                        MainTab.REQUESTS -> uiState.receivedRequestsBadgeCount
-                        else -> 0
-                    }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val useNavigationRail = maxWidth >= 600.dp
 
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = { selectedTab = tab },
-                        icon = {
-                            BadgedBox(
-                                badge = {
-                                    if (badgeCount > 0) {
-                                        Badge {
-                                            Text(
-                                                text = if (badgeCount > 99) "99+" else badgeCount.toString()
-                                            )
-                                        }
-                                    }
+        Scaffold(
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            bottomBar = {
+                if (!useNavigationRail) {
+                    Column {
+                        HorizontalDivider(
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                        )
+                        NavigationBar(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            tonalElevation = 0.dp
+                        ) {
+                            MainTab.entries.forEach { tab ->
+                                val isSelected = selectedTab == tab
+                                val badgeCount = when (tab) {
+                                    MainTab.CONVERSATIONS -> uiState.totalUnreadCount
+                                    MainTab.REQUESTS -> uiState.receivedRequestsBadgeCount
+                                    else -> 0
                                 }
-                            ) {
-                                Icon(
-                                    imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
-                                    contentDescription = tab.label
+
+                                NavigationBarItem(
+                                    selected = isSelected,
+                                    onClick = { selectedTab = tab },
+                                    icon = {
+                                        TabBadgeIcon(
+                                            icon = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                                            contentDescription = tab.label,
+                                            badgeCount = badgeCount
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = tab.label,
+                                            maxLines = 1
+                                        )
+                                    }
                                 )
                             }
+                        }
+                    }
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.background
+        ) { innerPadding ->
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                if (useNavigationRail) {
+                    NavigationRail(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        header = {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            QuietSignalBrandMark(size = 42.dp)
+                            Spacer(modifier = Modifier.height(8.dp))
                         },
-                        label = { Text(tab.label) }
+                        modifier = Modifier.fillMaxHeight()
+                    ) {
+                        MainTab.entries.forEach { tab ->
+                            val isSelected = selectedTab == tab
+                            val badgeCount = when (tab) {
+                                MainTab.CONVERSATIONS -> uiState.totalUnreadCount
+                                MainTab.REQUESTS -> uiState.receivedRequestsBadgeCount
+                                else -> 0
+                            }
+
+                            NavigationRailItem(
+                                selected = isSelected,
+                                onClick = { selectedTab = tab },
+                                icon = {
+                                    TabBadgeIcon(
+                                        icon = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                                        contentDescription = tab.label,
+                                        badgeCount = badgeCount
+                                    )
+                                },
+                                label = { Text(tab.label) }
+                            )
+                        }
+                    }
+
+                    VerticalDivider(
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                    )
+                }
+
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    when (selectedTab) {
+                        MainTab.CONVERSATIONS -> {
+                            ConversationsScreen(
+                                uiState = uiState,
+                                resolveAssetUrl = viewModel::resolveAssetUrl,
+                                onSearchQueryChange = viewModel::setConversationSearchQuery,
+                                onRefresh = viewModel::refreshConversations,
+                                onChangePresenceMode = viewModel::setPresenceMode,
+                                onConversationClick = onOpenConversation,
+                                onStartPrivateChat = { friend ->
+                                    viewModel.openOrCreatePrivateChat(
+                                        targetUserId = friend.id,
+                                        fallbackName = friend.fullName ?: friend.username,
+                                        fallbackUsername = friend.username,
+                                        fallbackAvatarUrl = friend.avatarUrl,
+                                        fallbackOnline = friend.isOnline,
+                                        onReady = onOpenConversation
+                                    )
+                                },
+                                onCreateGroupChat = { groupName, memberIds, groupVisibility ->
+                                    viewModel.createGroupChat(
+                                        name = groupName,
+                                        memberIds = memberIds,
+                                        groupVisibility = groupVisibility,
+                                        onReady = onOpenConversation
+                                    )
+                                },
+                                onPreviewGroupInvite = viewModel::previewGroupInvite,
+                                onJoinGroupByInvite = { codeOrLink ->
+                                    viewModel.joinGroupByInvite(
+                                        rawInput = codeOrLink,
+                                        onJoinedOpenChat = onOpenConversation
+                                    )
+                                },
+                                onClearInviteDialog = viewModel::clearGroupInviteDialogState
+                            )
+                        }
+
+                        MainTab.CONTACTS -> {
+                            ContactsScreen(
+                                uiState = uiState,
+                                resolveAssetUrl = viewModel::resolveAssetUrl,
+                                onContactsSearchChange = viewModel::setContactsSearchQuery,
+                                onRefresh = viewModel::refreshFriendsAndRequests,
+                                onFriendClick = { friend ->
+                                    viewModel.openOrCreatePrivateChat(
+                                        targetUserId = friend.id,
+                                        fallbackName = friend.fullName ?: friend.username,
+                                        fallbackUsername = friend.username,
+                                        fallbackAvatarUrl = friend.avatarUrl,
+                                        fallbackOnline = friend.isOnline,
+                                        onReady = onOpenConversation
+                                    )
+                                },
+                                onUnfriend = { friend ->
+                                    viewModel.unfriendUser(
+                                        targetUserId = friend.id,
+                                        displayName = friend.fullName?.takeIf { it.isNotBlank() }
+                                            ?: friend.username
+                                    )
+                                },
+                                onUserSearchKeywordChange = viewModel::onUserSearchKeywordChange,
+                                onExecuteUserSearch = { viewModel.executeUserSearch() },
+                                onResetUserSearch = viewModel::resetUserSearch,
+                                resolveRelationship = { user ->
+                                    viewModel.resolveUserRelationship(user, uiState)
+                                },
+                                onSendFriendRequest = viewModel::sendFriendRequest
+                            )
+                        }
+
+                        MainTab.REQUESTS -> {
+                            FriendRequestsScreen(
+                                uiState = uiState,
+                                resolveAssetUrl = viewModel::resolveAssetUrl,
+                                onRefresh = viewModel::refreshFriendsAndRequests,
+                                onAccept = viewModel::acceptFriendRequest,
+                                onReject = viewModel::rejectFriendRequest,
+                                onCancelSent = viewModel::cancelSentFriendRequest
+                            )
+                        }
+
+                        MainTab.PROFILE -> {
+                            ProfileScreen(
+                                uiState = uiState,
+                                isDarkThemeEffective = isDarkThemeEffective,
+                                resolveAssetUrl = viewModel::resolveAssetUrl,
+                                onUploadAvatar = viewModel::uploadAvatarAndSave,
+                                onSaveProfile = { fullName, email, phone, gender, dob, bio, avatarUrl ->
+                                    viewModel.updateProfile(
+                                        fullName = fullName,
+                                        email = email,
+                                        phone = phone,
+                                        gender = gender,
+                                        dob = dob,
+                                        bio = bio,
+                                        avatarUrl = avatarUrl
+                                    )
+                                },
+                                onToggleDarkMode = viewModel::setDarkMode,
+                                onToggleDynamicColor = viewModel::setDynamicColor,
+                                onChangePresenceMode = viewModel::setPresenceMode,
+                                onUpdateServerUrl = viewModel::updateServerUrl,
+                                onLogout = { viewModel.logout(onLoggedOut) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TabBadgeIcon(
+    icon: ImageVector,
+    contentDescription: String,
+    badgeCount: Int
+) {
+    BadgedBox(
+        badge = {
+            if (badgeCount > 0) {
+                Badge {
+                    Text(
+                        text = if (badgeCount > 99) "99+" else badgeCount.toString()
                     )
                 }
             }
         }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            when (selectedTab) {
-                MainTab.CONVERSATIONS -> {
-                    ConversationsScreen(
-                        uiState = uiState,
-                        resolveAssetUrl = viewModel::resolveAssetUrl,
-                        onSearchQueryChange = viewModel::setConversationSearchQuery,
-                        onRefresh = viewModel::refreshConversations,
-                        onChangePresenceMode = viewModel::setPresenceMode,
-                        onConversationClick = onOpenConversation,
-                        onStartPrivateChat = { friend ->
-                            viewModel.openOrCreatePrivateChat(
-                                targetUserId = friend.id,
-                                fallbackName = friend.fullName ?: friend.username,
-                                fallbackUsername = friend.username,
-                                fallbackAvatarUrl = friend.avatarUrl,
-                                fallbackOnline = friend.isOnline,
-                                onReady = onOpenConversation
-                            )
-                        },
-                        onCreateGroupChat = { groupName, memberIds, groupVisibility ->
-                            viewModel.createGroupChat(
-                                name = groupName,
-                                memberIds = memberIds,
-                                groupVisibility = groupVisibility,
-                                onReady = onOpenConversation
-                            )
-                        },
-                        onPreviewGroupInvite = viewModel::previewGroupInvite,
-                        onJoinGroupByInvite = { codeOrLink ->
-                            viewModel.joinGroupByInvite(
-                                rawInput = codeOrLink,
-                                onJoinedOpenChat = onOpenConversation
-                            )
-                        },
-                        onClearInviteDialog = viewModel::clearGroupInviteDialogState
-                    )
-                }
-
-                MainTab.CONTACTS -> {
-                    ContactsScreen(
-                        uiState = uiState,
-                        resolveAssetUrl = viewModel::resolveAssetUrl,
-                        onContactsSearchChange = viewModel::setContactsSearchQuery,
-                        onRefresh = viewModel::refreshFriendsAndRequests,
-                        onFriendClick = { friend ->
-                            viewModel.openOrCreatePrivateChat(
-                                targetUserId = friend.id,
-                                fallbackName = friend.fullName ?: friend.username,
-                                fallbackUsername = friend.username,
-                                fallbackAvatarUrl = friend.avatarUrl,
-                                fallbackOnline = friend.isOnline,
-                                onReady = onOpenConversation
-                            )
-                        },
-                        onUnfriend = { friend ->
-                            viewModel.unfriendUser(
-                                targetUserId = friend.id,
-                                displayName = friend.fullName?.takeIf { it.isNotBlank() } ?: friend.username
-                            )
-                        },
-                        onUserSearchKeywordChange = viewModel::onUserSearchKeywordChange,
-                        onExecuteUserSearch = { viewModel.executeUserSearch() },
-                        onResetUserSearch = viewModel::resetUserSearch,
-                        resolveRelationship = { user ->
-                            viewModel.resolveUserRelationship(user, uiState)
-                        },
-                        onSendFriendRequest = viewModel::sendFriendRequest
-                    )
-                }
-
-                MainTab.REQUESTS -> {
-                    FriendRequestsScreen(
-                        uiState = uiState,
-                        resolveAssetUrl = viewModel::resolveAssetUrl,
-                        onRefresh = viewModel::refreshFriendsAndRequests,
-                        onAccept = viewModel::acceptFriendRequest,
-                        onReject = viewModel::rejectFriendRequest,
-                        onCancelSent = viewModel::cancelSentFriendRequest
-                    )
-                }
-
-                MainTab.PROFILE -> {
-                    ProfileScreen(
-                        uiState = uiState,
-                        isDarkThemeEffective = isDarkThemeEffective,
-                        resolveAssetUrl = viewModel::resolveAssetUrl,
-                        onUploadAvatar = viewModel::uploadAvatarAndSave,
-                        onSaveProfile = { fullName, email, phone, gender, dob, bio, avatarUrl ->
-                            viewModel.updateProfile(
-                                fullName = fullName,
-                                email = email,
-                                phone = phone,
-                                gender = gender,
-                                dob = dob,
-                                bio = bio,
-                                avatarUrl = avatarUrl
-                            )
-                        },
-                        onToggleDarkMode = viewModel::setDarkMode,
-                        onChangePresenceMode = viewModel::setPresenceMode,
-                        onUpdateServerUrl = viewModel::updateServerUrl,
-                        onLogout = { viewModel.logout(onLoggedOut) }
-                    )
-                }
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = if (badgeCount > 0) {
+                "$contentDescription, $badgeCount thông báo mới"
+            } else {
+                contentDescription
             }
-        }
+        )
     }
 }

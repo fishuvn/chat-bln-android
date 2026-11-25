@@ -48,6 +48,37 @@ data class LogoutResponse(
     @SerializedName("status") val status: String? = null
 )
 
+data class ForgotPasswordOtpRequest(
+    @SerializedName("email") val email: String
+)
+
+data class ForgotPasswordOtpResponse(
+    @SerializedName("email") val email: String? = null,
+    @SerializedName("username") val username: String? = null,
+    @SerializedName("fullName") val fullName: String? = null,
+    @SerializedName("otp") val otp: String? = null,
+    @SerializedName("message") val message: String? = null
+)
+
+data class VerifyForgotPasswordOtpRequest(
+    @SerializedName("email") val email: String,
+    @SerializedName("otp") val otp: String
+)
+
+data class VerifyForgotPasswordOtpResponse(
+    @SerializedName("verified") val verified: Boolean = false
+)
+
+data class ResetPasswordWithOtpRequest(
+    @SerializedName("email") val email: String,
+    @SerializedName("otp") val otp: String,
+    @SerializedName("newPassword") val newPassword: String
+)
+
+data class ResetPasswordWithOtpResponse(
+    @SerializedName("reset") val reset: Boolean = false
+)
+
 data class UserProfileResponse(
     @SerializedName("id") val id: Long,
     @SerializedName("username") val username: String,

@@ -7,6 +7,8 @@ import nhom3.chatbln.android.data.model.CreateGroupConversationRequest
 import nhom3.chatbln.android.data.model.CreatePrivateConversationRequest
 import nhom3.chatbln.android.data.model.DeleteMessagesRequest
 import nhom3.chatbln.android.data.model.DeleteMessagesResponse
+import nhom3.chatbln.android.data.model.ForgotPasswordOtpRequest
+import nhom3.chatbln.android.data.model.ForgotPasswordOtpResponse
 import nhom3.chatbln.android.data.model.FriendRequestDto
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.data.model.FriendshipResponse
@@ -20,6 +22,8 @@ import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.data.model.MessageHistoryResponse
 import nhom3.chatbln.android.data.model.RegenerateInviteCodeResponse
 import nhom3.chatbln.android.data.model.RegisterRequest
+import nhom3.chatbln.android.data.model.ResetPasswordWithOtpRequest
+import nhom3.chatbln.android.data.model.ResetPasswordWithOtpResponse
 import nhom3.chatbln.android.data.model.SendMessageRequest
 import nhom3.chatbln.android.data.model.TransferGroupLeaderRequest
 import nhom3.chatbln.android.data.model.UpdateGroupVisibilityRequest
@@ -29,6 +33,8 @@ import nhom3.chatbln.android.data.model.UpdateProfileRequest
 import nhom3.chatbln.android.data.model.UploadResponse
 import nhom3.chatbln.android.data.model.UserProfileResponse
 import nhom3.chatbln.android.data.model.UserSearchResponse
+import nhom3.chatbln.android.data.model.VerifyForgotPasswordOtpRequest
+import nhom3.chatbln.android.data.model.VerifyForgotPasswordOtpResponse
 import okhttp3.MultipartBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -50,6 +56,21 @@ interface ChatBlnApiService {
 
     @POST("auth/logout")
     suspend fun logout(): LogoutResponse
+
+    @POST("auth/forgot-password/request")
+    suspend fun requestPasswordResetOtp(
+        @Body request: ForgotPasswordOtpRequest
+    ): ForgotPasswordOtpResponse
+
+    @POST("auth/forgot-password/verify")
+    suspend fun verifyPasswordResetOtp(
+        @Body request: VerifyForgotPasswordOtpRequest
+    ): VerifyForgotPasswordOtpResponse
+
+    @POST("auth/forgot-password/reset")
+    suspend fun resetPasswordWithOtp(
+        @Body request: ResetPasswordWithOtpRequest
+    ): ResetPasswordWithOtpResponse
 
     @GET("users/me")
     suspend fun getMyProfile(): UserProfileResponse

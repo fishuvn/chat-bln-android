@@ -1,7 +1,6 @@
 package nhom3.chatbln.android.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -9,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,10 +40,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import nhom3.chatbln.android.data.model.FriendshipResponse
 import nhom3.chatbln.android.ui.components.AvatarView
+import nhom3.chatbln.android.ui.components.TonalListSkeleton
 import nhom3.chatbln.android.ui.util.formatMessageTime
 import nhom3.chatbln.android.ui.viewmodel.MainChatUiState
 
@@ -65,14 +69,18 @@ fun FriendRequestsScreen(
                 title = {
                     Text(
                         text = "Lời mời kết bạn",
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics { heading() }
                     )
                 },
                 actions = {
-                    IconButton(onClick = onRefresh) {
+                    IconButton(
+                        onClick = onRefresh,
+                        modifier = Modifier.size(48.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Outlined.Refresh,
-                            contentDescription = "Làm mới lời mời"
+                            contentDescription = "Làm mới lời mời kết bạn"
                         )
                     }
                 },
@@ -95,12 +103,14 @@ fun FriendRequestsScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Đã nhận (${uiState.receivedRequests.size})") }
+                    text = { Text("Đã nhận (${uiState.receivedRequests.size})") },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Đã gửi (${uiState.sentRequests.size})") }
+                    text = { Text("Đã gửi (${uiState.sentRequests.size})") },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 )
             }
 
@@ -108,12 +118,7 @@ fun FriendRequestsScreen(
                 uiState.isRequestsLoading &&
                     uiState.receivedRequests.isEmpty() &&
                     uiState.sentRequests.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    TonalListSkeleton(rowCount = 5, showTrailingAction = true)
                 }
 
                 selectedTab == 0 -> {
@@ -121,14 +126,18 @@ fun FriendRequestsScreen(
                         EmptyRequestsState(
                             icon = Icons.Outlined.HowToReg,
                             title = "Không có lời mời kết bạn mới",
-                            subtitle = "Khi người khác gửi lời mời kết bạn, bạn có thể xác nhận tại đây."
+                            subtitle = "Khi người khác gửi lời mời kết bạn, bạn có thể xác nhận hoặc từ chối tại đây."
                         )
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(vertical = 8.dp)
                         ) {
-                            items(items = uiState.receivedRequests, key = { it.id }) { req ->
+                            items(
+                                items = uiState.receivedRequests,
+                                key = { "received_${it.id}" },
+                                contentType = { "received_request" }
+                            ) { req ->
                                 val isProcessing = uiState.processingRequestIds.contains(req.id)
                                 val displayName = req.requesterFullName
                                     ?.takeIf { it.isNotBlank() }
@@ -180,14 +189,16 @@ fun FriendRequestsScreen(
                                         OutlinedButton(
                                             onClick = { onReject(req) },
                                             enabled = !isProcessing,
-                                            shape = RoundedCornerShape(10.dp)
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.heightIn(min = 48.dp)
                                         ) {
                                             Text("Từ chối")
                                         }
                                         Button(
                                             onClick = { onAccept(req) },
                                             enabled = !isProcessing,
-                                            shape = RoundedCornerShape(10.dp)
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.heightIn(min = 48.dp)
                                         ) {
                                             if (isProcessing) {
                                                 CircularProgressIndicator(
@@ -203,7 +214,7 @@ fun FriendRequestsScreen(
                                 }
                                 HorizontalDivider(
                                     modifier = Modifier.padding(horizontal = 16.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
                                 )
                             }
                         }
@@ -222,7 +233,11 @@ fun FriendRequestsScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(vertical = 8.dp)
                         ) {
-                            items(items = uiState.sentRequests, key = { it.id }) { req ->
+                            items(
+                                items = uiState.sentRequests,
+                                key = { "sent_${it.id}" },
+                                contentType = { "sent_request" }
+                            ) { req ->
                                 val isProcessing = uiState.processingRequestIds.contains(req.id)
                                 val knownTarget = uiState.knownUsersById[req.addresseeId]
                                 val targetName = req.addresseeFullName?.takeIf { it.isNotBlank() }
@@ -271,7 +286,8 @@ fun FriendRequestsScreen(
                                     OutlinedButton(
                                         onClick = { onCancelSent(req) },
                                         enabled = !isProcessing,
-                                        shape = RoundedCornerShape(10.dp)
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.heightIn(min = 48.dp)
                                     ) {
                                         if (isProcessing) {
                                             CircularProgressIndicator(
@@ -285,7 +301,7 @@ fun FriendRequestsScreen(
                                 }
                                 HorizontalDivider(
                                     modifier = Modifier.padding(start = 74.dp, end = 16.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
                                 )
                             }
                         }
@@ -313,18 +329,20 @@ private fun EmptyRequestsState(
             imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(48.dp)
+            modifier = Modifier.size(44.dp)
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
         )
     }
 }

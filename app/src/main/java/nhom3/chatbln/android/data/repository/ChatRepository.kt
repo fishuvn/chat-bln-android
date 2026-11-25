@@ -18,6 +18,8 @@ import nhom3.chatbln.android.data.model.CreateGroupConversationRequest
 import nhom3.chatbln.android.data.model.CreatePrivateConversationRequest
 import nhom3.chatbln.android.data.model.DeleteMessagesRequest
 import nhom3.chatbln.android.data.model.DeleteMessagesResponse
+import nhom3.chatbln.android.data.model.ForgotPasswordOtpRequest
+import nhom3.chatbln.android.data.model.ForgotPasswordOtpResponse
 import nhom3.chatbln.android.data.model.FriendRequestDto
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.data.model.FriendshipResponse
@@ -30,6 +32,8 @@ import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.data.model.MessageHistoryResponse
 import nhom3.chatbln.android.data.model.RegenerateInviteCodeResponse
 import nhom3.chatbln.android.data.model.RegisterRequest
+import nhom3.chatbln.android.data.model.ResetPasswordWithOtpRequest
+import nhom3.chatbln.android.data.model.ResetPasswordWithOtpResponse
 import nhom3.chatbln.android.data.model.SendMessageRequest
 import nhom3.chatbln.android.data.model.TransferGroupLeaderRequest
 import nhom3.chatbln.android.data.model.UpdateGroupVisibilityRequest
@@ -39,6 +43,8 @@ import nhom3.chatbln.android.data.model.UpdateProfileRequest
 import nhom3.chatbln.android.data.model.UploadResponse
 import nhom3.chatbln.android.data.model.UserProfileResponse
 import nhom3.chatbln.android.data.model.UserSearchResponse
+import nhom3.chatbln.android.data.model.VerifyForgotPasswordOtpRequest
+import nhom3.chatbln.android.data.model.VerifyForgotPasswordOtpResponse
 import nhom3.chatbln.android.data.remote.ChatBlnApiService
 import nhom3.chatbln.android.ui.util.parseInviteCodeInput
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -106,6 +112,36 @@ class ChatRepository(
         runCatching { apiService.logout() }
         sessionPreferences.clearAuthSession()
         return Result.success(Unit)
+    }
+
+    suspend fun requestPasswordResetOtp(email: String): Result<ForgotPasswordOtpResponse> =
+        safeApiCall {
+            apiService.requestPasswordResetOtp(
+                ForgotPasswordOtpRequest(email = email.trim())
+            )
+        }
+
+    suspend fun verifyPasswordResetOtp(
+        email: String,
+        otp: String
+    ): Result<VerifyForgotPasswordOtpResponse> = safeApiCall {
+        apiService.verifyPasswordResetOtp(
+            VerifyForgotPasswordOtpRequest(email = email.trim(), otp = otp.trim())
+        )
+    }
+
+    suspend fun resetPasswordWithOtp(
+        email: String,
+        otp: String,
+        newPassword: String
+    ): Result<ResetPasswordWithOtpResponse> = safeApiCall {
+        apiService.resetPasswordWithOtp(
+            ResetPasswordWithOtpRequest(
+                email = email.trim(),
+                otp = otp.trim(),
+                newPassword = newPassword
+            )
+        )
     }
 
     suspend fun getMyProfile(): Result<UserProfileResponse> = safeApiCall {

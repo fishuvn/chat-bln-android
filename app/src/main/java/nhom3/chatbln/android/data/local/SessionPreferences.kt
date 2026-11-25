@@ -78,6 +78,10 @@ class SessionPreferences(context: Context) {
         prefs[KEY_DARK_MODE]
     }
 
+    val dynamicColorFlow: Flow<Boolean> = appContext.sessionDataStore.data.map { prefs ->
+        prefs[KEY_DYNAMIC_COLOR] ?: false
+    }
+
     val presenceModeFlow: Flow<UserPresenceMode> = appContext.sessionDataStore.data.map { prefs ->
         UserPresenceMode.fromRaw(prefs[KEY_PRESENCE_MODE])
     }
@@ -127,6 +131,12 @@ class SessionPreferences(context: Context) {
         }
     }
 
+    suspend fun setDynamicColor(enabled: Boolean) {
+        appContext.sessionDataStore.edit { prefs ->
+            prefs[KEY_DYNAMIC_COLOR] = enabled
+        }
+    }
+
     suspend fun setPresenceMode(mode: UserPresenceMode) {
         appContext.sessionDataStore.edit { prefs ->
             prefs[KEY_PRESENCE_MODE] = mode.rawValue
@@ -162,6 +172,7 @@ class SessionPreferences(context: Context) {
         private val KEY_AUTH_TOKEN = stringPreferencesKey("auth_token")
         private val KEY_CACHED_USER = stringPreferencesKey("cached_user_json")
         private val KEY_DARK_MODE = booleanPreferencesKey("dark_mode")
+        private val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         private val KEY_PRESENCE_MODE = stringPreferencesKey("presence_mode")
         private val KEY_SERVER_BASE_URL = stringPreferencesKey("server_base_url")
 

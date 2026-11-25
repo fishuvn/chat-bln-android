@@ -1,28 +1,27 @@
 package nhom3.chatbln.android.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Dns
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Visibility
@@ -36,7 +35,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -48,13 +46,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import nhom3.chatbln.android.ui.components.AlertBannerTone
+import nhom3.chatbln.android.ui.components.InlineAlertBanner
+import nhom3.chatbln.android.ui.components.QuietSignalBrandMark
 import nhom3.chatbln.android.ui.components.ServerUrlDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,9 +64,11 @@ import nhom3.chatbln.android.ui.components.ServerUrlDialog
 fun LoginScreen(
     isLoading: Boolean,
     errorMessage: String?,
+    successNotice: String? = null,
     serverBaseUrl: String,
     onLogin: (username: String, password: String) -> Unit,
     onNavigateToRegister: () -> Unit,
+    onNavigateToForgotPassword: () -> Unit,
     onUpdateServerUrl: (String) -> Unit,
     onClearError: () -> Unit
 ) {
@@ -86,14 +90,20 @@ fun LoginScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(
                 title = {},
                 actions = {
-                    TextButton(onClick = { showServerDialog = true }) {
+                    TextButton(
+                        onClick = { showServerDialog = true },
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .heightIn(min = 48.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Outlined.Dns,
-                            contentDescription = null,
+                            contentDescription = "Cấu hình máy chủ",
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.size(6.dp))
@@ -125,124 +135,125 @@ fun LoginScreen(
                     .padding(horizontal = 24.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.ChatBubbleOutline,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                QuietSignalBrandMark()
 
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "Đăng nhập Chat BLN",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onBackground
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.semantics { heading() }
                     )
                     Text(
-                        text = "Kết nối tin nhắn, tệp đính kèm và trạng thái hoạt động trực tiếp với máy chủ.",
+                        text = "Nhắn tin thời gian thực, chia sẻ tệp đính kèm và cộng tác nhóm trên giao diện tối giản.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
+                if (!successNotice.isNullOrBlank()) {
+                    InlineAlertBanner(
+                        message = successNotice,
+                        tone = AlertBannerTone.SUCCESS
+                    )
+                }
+
                 if (!errorMessage.isNullOrBlank()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.ErrorOutline,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = errorMessage,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
+                    InlineAlertBanner(
+                        message = errorMessage,
+                        tone = AlertBannerTone.ERROR
+                    )
                 }
 
                 OutlinedTextField(
                     value = username,
                     onValueChange = {
                         username = it
-                        if (errorMessage != null) onClearError()
+                        if (errorMessage != null || successNotice != null) onClearError()
                     },
-                    label = { Text("Tên đăng nhập") },
-                    placeholder = { Text("Nhập username") },
+                    label = { Text("Tên đăng nhập hoặc Email") },
+                    placeholder = { Text("Nhập username hoặc email") },
                     leadingIcon = {
                         Icon(imageVector = Icons.Outlined.PersonOutline, contentDescription = null)
                     },
                     singleLine = true,
                     enabled = !isLoading,
+                    shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Ascii,
+                        keyboardType = KeyboardType.Email,
                         imeAction = ImeAction.Next
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = {
-                        password = it
-                        if (errorMessage != null) onClearError()
-                    },
-                    label = { Text("Mật khẩu") },
-                    placeholder = { Text("Nhập mật khẩu") },
-                    leadingIcon = {
-                        Icon(imageVector = Icons.Outlined.Lock, contentDescription = null)
-                    },
-                    trailingIcon = {
-                        IconButton(onClick = { showPassword = !showPassword }) {
-                            Icon(
-                                imageVector = if (showPassword) {
-                                    Icons.Outlined.VisibilityOff
-                                } else {
-                                    Icons.Outlined.Visibility
-                                },
-                                contentDescription = if (showPassword) "Ẩn mật khẩu" else "Hiện mật khẩu"
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = {
+                            password = it
+                            if (errorMessage != null || successNotice != null) onClearError()
+                        },
+                        label = { Text("Mật khẩu") },
+                        placeholder = { Text("Nhập mật khẩu") },
+                        leadingIcon = {
+                            Icon(imageVector = Icons.Outlined.Lock, contentDescription = null)
+                        },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { showPassword = !showPassword },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (showPassword) {
+                                        Icons.Outlined.VisibilityOff
+                                    } else {
+                                        Icons.Outlined.Visibility
+                                    },
+                                    contentDescription = if (showPassword) {
+                                        "Ẩn mật khẩu"
+                                    } else {
+                                        "Hiện mật khẩu"
+                                    }
+                                )
+                            }
+                        },
+                        visualTransformation = if (showPassword) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        singleLine = true,
+                        enabled = !isLoading,
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                focusManager.clearFocus()
+                                onLogin(username, password)
+                            }
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = onNavigateToForgotPassword,
+                            enabled = !isLoading,
+                            modifier = Modifier.heightIn(min = 48.dp)
+                        ) {
+                            Text(
+                                text = "Quên mật khẩu?",
+                                style = MaterialTheme.typography.labelLarge
                             )
                         }
-                    },
-                    visualTransformation = if (showPassword) {
-                        VisualTransformation.None
-                    } else {
-                        PasswordVisualTransformation()
-                    },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            focusManager.clearFocus()
-                            onLogin(username, password)
-                        }
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
 
                 Button(
                     onClick = {
@@ -253,7 +264,7 @@ fun LoginScreen(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .heightIn(min = 50.dp)
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
@@ -275,10 +286,15 @@ fun LoginScreen(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .heightIn(min = 48.dp)
                 ) {
-                    Text("Tạo tài khoản mới")
+                    Text(
+                        text = "Tạo tài khoản mới",
+                        style = MaterialTheme.typography.labelLarge
+                    )
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
