@@ -17,6 +17,7 @@ import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.data.model.MessageHistoryResponse
 import nhom3.chatbln.android.data.model.RegisterRequest
 import nhom3.chatbln.android.data.model.SendMessageRequest
+import nhom3.chatbln.android.data.model.UpdatePresenceRequest
 import nhom3.chatbln.android.data.model.UpdateProfileRequest
 import nhom3.chatbln.android.data.model.UploadResponse
 import nhom3.chatbln.android.data.model.UserProfileResponse
@@ -48,6 +49,9 @@ interface ChatBlnApiService {
 
     @PUT("users/me")
     suspend fun updateMyProfile(@Body request: UpdateProfileRequest): UserProfileResponse
+
+    @PUT("users/me/presence")
+    suspend fun updateMyPresence(@Body request: UpdatePresenceRequest): UserProfileResponse
 
     @GET("users/search")
     suspend fun searchUsers(@Query("keyword") keyword: String): List<UserSearchResponse>

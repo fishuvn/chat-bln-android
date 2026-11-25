@@ -271,6 +271,7 @@ fun ContactsScreen(
                                     avatarUrl = resolveAssetUrl(friend.avatarUrl),
                                     size = 48.dp,
                                     isOnline = friend.isOnline,
+                                    presenceStatus = friend.presenceStatus,
                                     showOnlineBadge = true
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -283,7 +284,7 @@ fun ContactsScreen(
                                     )
                                     Text(
                                         text = "@${friend.username} · ${
-                                            formatPresenceLabel(friend.isOnline, friend.lastSeen)
+                                            formatPresenceLabel(friend.isOnline, friend.lastSeen, friend.presenceStatus)
                                         }",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = if (friend.isOnline) {

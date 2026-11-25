@@ -215,6 +215,7 @@ fun AddFriendBottomSheet(
                                     avatarUrl = resolveAssetUrl(user.avatarUrl),
                                     size = 44.dp,
                                     isOnline = user.isOnline == true,
+                                    presenceStatus = user.presenceStatus,
                                     showOnlineBadge = true
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))

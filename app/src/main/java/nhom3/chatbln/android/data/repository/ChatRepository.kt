@@ -27,6 +27,7 @@ import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.data.model.MessageHistoryResponse
 import nhom3.chatbln.android.data.model.RegisterRequest
 import nhom3.chatbln.android.data.model.SendMessageRequest
+import nhom3.chatbln.android.data.model.UpdatePresenceRequest
 import nhom3.chatbln.android.data.model.UpdateProfileRequest
 import nhom3.chatbln.android.data.model.UploadResponse
 import nhom3.chatbln.android.data.model.UserProfileResponse
@@ -108,6 +109,13 @@ class ChatRepository(
     suspend fun updateMyProfile(request: UpdateProfileRequest): Result<UserProfileResponse> =
         safeApiCall {
             val updated = apiService.updateMyProfile(request)
+            sessionPreferences.updateCachedUser(updated.toCachedUser())
+            updated
+        }
+
+    suspend fun updateMyPresence(presenceStatus: String): Result<UserProfileResponse> =
+        safeApiCall {
+            val updated = apiService.updateMyPresence(UpdatePresenceRequest(presenceStatus = presenceStatus))
             sessionPreferences.updateCachedUser(updated.toCachedUser())
             updated
         }

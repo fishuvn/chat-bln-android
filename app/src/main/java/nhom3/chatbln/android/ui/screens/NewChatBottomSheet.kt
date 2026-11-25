@@ -183,6 +183,7 @@ fun NewChatBottomSheet(
                                 avatarUrl = resolveAssetUrl(friend.avatarUrl),
                                 size = 44.dp,
                                 isOnline = friend.isOnline,
+                                presenceStatus = friend.presenceStatus,
                                 showOnlineBadge = true
                             )
                             Spacer(modifier = Modifier.width(12.dp))

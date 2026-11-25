@@ -118,9 +118,7 @@ class MainChatViewModel(
                 val username = cachedUser?.username
                 if (!username.isNullOrBlank() && initializedForUsername != username) {
                     initializedForUsername = username
-                    if (_uiState.value.presenceMode != UserPresenceMode.OFFLINE) {
-                        stompClient.connect(username)
-                    }
+                    stompClient.connect(username)
                     refreshAll()
                 } else if (username.isNullOrBlank()) {
                     initializedForUsername = null
@@ -191,7 +189,18 @@ class MainChatViewModel(
     fun refreshProfile() {
         viewModelScope.launch {
             repository.getMyProfile().onSuccess { profile ->
-                _uiState.update { it.copy(profile = profile) }
+                val serverMode = profile.presenceStatus
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { UserPresenceMode.fromRaw(it) }
+                if (serverMode != null) {
+                    sessionPreferences.setPresenceMode(serverMode)
+                }
+                _uiState.update {
+                    it.copy(
+                        profile = profile,
+                        presenceMode = serverMode ?: it.presenceMode
+                    )
+                }
             }
         }
     }
@@ -1090,13 +1099,24 @@ class MainChatViewModel(
             sessionPreferences.setPresenceMode(mode)
             _uiState.update { it.copy(presenceMode = mode) }
             val username = _uiState.value.currentUser?.username ?: initializedForUsername
-            if (mode == UserPresenceMode.OFFLINE) {
-                stompClient.disconnect()
-                repository.markOfflineOnServer()
-            } else if (!username.isNullOrBlank()) {
+            if (!username.isNullOrBlank()) {
                 stompClient.connect(username)
-                refreshConversations()
             }
+            repository.updateMyPresence(mode.rawValue).fold(
+                onSuccess = { updated ->
+                    _uiState.update {
+                        it.copy(
+                            profile = updated,
+                            snackbarMessage = "Đã chuyển trạng thái sang ${mode.title}."
+                        )
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(snackbarMessage = err.message ?: "Không thể cập nhật trạng thái.")
+                    }
+                }
+            )
         }
     }
 
@@ -1308,11 +1328,21 @@ class MainChatViewModel(
     }
 
     private fun handlePresenceEvent(event: PresenceEvent) {
+        val resolvedStatus = event.presenceStatus ?: if (event.isOnline) "ONLINE" else "OFFLINE"
+        val isSelf = event.username.equals(_uiState.value.currentUser?.username, ignoreCase = true)
+        if (isSelf && event.isOnline) {
+            val syncedMode = UserPresenceMode.fromRaw(resolvedStatus)
+            viewModelScope.launch {
+                sessionPreferences.setPresenceMode(syncedMode)
+            }
+        }
+
         _uiState.update { state ->
             val updatedConversations = state.conversations.map { conv ->
                 if (!conv.isGroup && conv.targetUserId == event.userId) {
                     conv.copy(
                         isOnline = event.isOnline,
+                        presenceStatus = resolvedStatus,
                         lastSeen = event.lastSeen ?: conv.lastSeen
                     )
                 } else {
@@ -1324,6 +1354,7 @@ class MainChatViewModel(
                 if (friend.id == event.userId) {
                     friend.copy(
                         isOnline = event.isOnline,
+                        presenceStatus = resolvedStatus,
                         lastSeen = event.lastSeen ?: friend.lastSeen
                     )
                 } else {
@@ -1336,6 +1367,7 @@ class MainChatViewModel(
                     if (member.id == event.userId) {
                         member.copy(
                             isOnline = event.isOnline,
+                            presenceStatus = resolvedStatus,
                             lastSeen = event.lastSeen ?: member.lastSeen
                         )
                     } else {
@@ -1345,6 +1377,7 @@ class MainChatViewModel(
             }
 
             state.copy(
+                presenceMode = if (isSelf && event.isOnline) UserPresenceMode.fromRaw(resolvedStatus) else state.presenceMode,
                 conversations = updatedConversations,
                 friends = updatedFriends,
                 groupMembersByConversation = updatedGroupMembers

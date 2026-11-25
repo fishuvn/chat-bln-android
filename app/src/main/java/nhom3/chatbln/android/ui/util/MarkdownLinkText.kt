@@ -158,8 +158,19 @@ fun formatConversationListTime(iso: String?): String {
     }
 }
 
-fun formatPresenceLabel(isOnline: Boolean?, lastSeen: String?): String {
-    if (isOnline == true) return "Đang hoạt động"
+fun formatPresenceLabel(
+    isOnline: Boolean?,
+    lastSeen: String?,
+    presenceStatus: String? = null
+): String {
+    if (isOnline == true) {
+        return when (presenceStatus?.trim()?.uppercase()) {
+            "IDLE", "AWAY" -> "Tạm vắng (Idle)"
+            "SLEEP" -> "Chế độ ngủ (Sleep)"
+            "DND", "BUSY" -> "Không làm phiền (DND)"
+            else -> "Trực tuyến"
+        }
+    }
     val dt = parseBackendDateTime(lastSeen) ?: return "Ngoại tuyến"
     val minutes = Duration.between(dt, LocalDateTime.now()).toMinutes().coerceAtLeast(0)
     return when {

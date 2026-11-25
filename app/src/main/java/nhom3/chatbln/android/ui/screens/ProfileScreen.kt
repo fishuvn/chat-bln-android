@@ -242,6 +242,7 @@ fun ProfileScreen(
                         avatarUrl = resolveAssetUrl(rawAvatarUrl),
                         size = 76.dp,
                         isOnline = uiState.presenceMode != UserPresenceMode.OFFLINE,
+                        presenceStatus = uiState.presenceMode.rawValue,
                         showOnlineBadge = true
                     )
                     Spacer(modifier = Modifier.width(16.dp))

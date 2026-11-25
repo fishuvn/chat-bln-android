@@ -87,14 +87,15 @@ fun ConversationsScreen(
         uiState.presenceMode == UserPresenceMode.OFFLINE -> MaterialTheme.colorScheme.outline
         !uiState.isWsConnected -> Color(0xFFF59E0B)
         uiState.presenceMode == UserPresenceMode.ONLINE -> connectedDotColor
-        uiState.presenceMode == UserPresenceMode.AWAY -> Color(0xFFEAB308)
-        uiState.presenceMode == UserPresenceMode.BUSY -> Color(0xFFEF4444)
+        uiState.presenceMode == UserPresenceMode.IDLE -> Color(0xFFF59E0B)
+        uiState.presenceMode == UserPresenceMode.SLEEP -> Color(0xFF8B5CF6)
+        uiState.presenceMode == UserPresenceMode.DND -> Color(0xFFEF4444)
         else -> connectedDotColor
     }
     val statusLabel = when {
         uiState.presenceMode == UserPresenceMode.OFFLINE -> "Ẩn trạng thái"
-        !uiState.isWsConnected -> "${uiState.presenceMode.title} · Đang nối..."
-        else -> uiState.presenceMode.title
+        !uiState.isWsConnected -> "${uiState.presenceMode.shortTitle} · Đang nối..."
+        else -> uiState.presenceMode.shortTitle
     }
 
     val filteredConversations = remember(
@@ -389,6 +390,7 @@ private fun ConversationRow(
             avatarUrl = resolvedAvatarUrl,
             size = 50.dp,
             isOnline = item.isOnline == true,
+            presenceStatus = item.presenceStatus,
             showOnlineBadge = !item.isGroup,
             isGroup = item.isGroup
         )

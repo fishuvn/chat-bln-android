@@ -18,15 +18,22 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import nhom3.chatbln.android.data.model.CachedUser
 
-enum class UserPresenceMode(val rawValue: String, val title: String) {
-    ONLINE("online", "Trực tuyến"),
-    AWAY("away", "Tạm vắng"),
-    BUSY("busy", "Đang bận"),
-    OFFLINE("offline", "Ẩn trạng thái (Ngoại tuyến)");
+enum class UserPresenceMode(val rawValue: String, val title: String, val shortTitle: String) {
+    ONLINE("ONLINE", "Trực tuyến (Online)", "Trực tuyến"),
+    IDLE("IDLE", "Tạm vắng (Idle)", "Tạm vắng"),
+    SLEEP("SLEEP", "Chế độ ngủ (Sleep)", "Chế độ ngủ"),
+    DND("DND", "Không làm phiền (DND)", "Không làm phiền"),
+    OFFLINE("OFFLINE", "Ẩn trạng thái (Offline)", "Ẩn trạng thái");
 
     companion object {
         fun fromRaw(raw: String?): UserPresenceMode {
-            return entries.firstOrNull { it.rawValue.equals(raw, ignoreCase = true) } ?: ONLINE
+            return when (raw?.trim()?.uppercase()) {
+                "IDLE", "AWAY" -> IDLE
+                "SLEEP" -> SLEEP
+                "DND", "BUSY" -> DND
+                "OFFLINE", "INVISIBLE" -> OFFLINE
+                else -> ONLINE
+            }
         }
     }
 }

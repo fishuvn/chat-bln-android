@@ -190,6 +190,7 @@ fun ConversationInfoSheet(
                     avatarUrl = resolveAssetUrl(conversation.avatarUrl),
                     size = 72.dp,
                     isOnline = conversation.isOnline == true,
+                    presenceStatus = conversation.presenceStatus,
                     showOnlineBadge = !conversation.isGroup,
                     isGroup = conversation.isGroup
                 )
@@ -205,7 +206,7 @@ fun ConversationInfoSheet(
                             ?.takeIf { it.isNotBlank() }
                             ?.let { "@$it · " }
                             .orEmpty()
-                        usernamePart + formatPresenceLabel(conversation.isOnline, conversation.lastSeen)
+                        usernamePart + formatPresenceLabel(conversation.isOnline, conversation.lastSeen, conversation.presenceStatus)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -283,6 +284,7 @@ fun ConversationInfoSheet(
                                                 avatarUrl = resolveAssetUrl(member.avatarUrl),
                                                 size = 42.dp,
                                                 isOnline = member.isOnline,
+                                                presenceStatus = member.presenceStatus,
                                                 showOnlineBadge = true
                                             )
                                             Spacer(modifier = Modifier.width(12.dp))

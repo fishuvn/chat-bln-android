@@ -53,6 +53,7 @@ data class UserProfileResponse(
     @SerializedName("bio") val bio: String? = null,
     @SerializedName("avatarUrl") val avatarUrl: String? = null,
     @SerializedName(value = "isOnline", alternate = ["online"]) val isOnline: Boolean? = false,
+    @SerializedName("presenceStatus") val presenceStatus: String? = null,
     @SerializedName("lastSeen") val lastSeen: String? = null
 ) {
     fun toCachedUser(): CachedUser = CachedUser(
@@ -78,12 +79,17 @@ data class UpdateProfileRequest(
     @SerializedName("avatarUrl") val avatarUrl: String?
 )
 
+data class UpdatePresenceRequest(
+    @SerializedName("presenceStatus") val presenceStatus: String
+)
+
 data class UserSearchResponse(
     @SerializedName("id") val id: Long,
     @SerializedName("username") val username: String,
     @SerializedName("fullName") val fullName: String?,
     @SerializedName("avatarUrl") val avatarUrl: String? = null,
     @SerializedName(value = "isOnline", alternate = ["online"]) val isOnline: Boolean? = false,
+    @SerializedName("presenceStatus") val presenceStatus: String? = null,
     @SerializedName(value = "isFriend", alternate = ["friend"]) val isFriend: Boolean? = null,
     @SerializedName("friendshipStatus") val friendshipStatus: String? = null
 )
@@ -94,6 +100,7 @@ data class ConversationItemResponse(
     @SerializedName("type") val type: String = "PRIVATE",
     @SerializedName("avatarUrl") val avatarUrl: String? = null,
     @SerializedName(value = "isOnline", alternate = ["online"]) val isOnline: Boolean? = false,
+    @SerializedName("presenceStatus") val presenceStatus: String? = null,
     @SerializedName("targetUserId") val targetUserId: Long? = null,
     @SerializedName("targetUsername") val targetUsername: String? = null,
     @SerializedName("email") val email: String? = null,
@@ -129,6 +136,7 @@ data class GroupMemberDto(
     @SerializedName("avatarUrl") val avatarUrl: String? = null,
     @SerializedName("role") val role: String? = null,
     @SerializedName(value = "isOnline", alternate = ["online"]) val isOnline: Boolean = false,
+    @SerializedName("presenceStatus") val presenceStatus: String? = null,
     @SerializedName("lastSeen") val lastSeen: String? = null,
     @SerializedName("joinedAt") val joinedAt: String? = null
 ) {
@@ -225,6 +233,7 @@ data class PresenceEvent(
     @SerializedName("userId") val userId: Long,
     @SerializedName("username") val username: String,
     @SerializedName(value = "isOnline", alternate = ["online"]) val isOnline: Boolean = false,
+    @SerializedName("presenceStatus") val presenceStatus: String? = null,
     @SerializedName("lastSeen") val lastSeen: String? = null
 )
 
@@ -238,6 +247,7 @@ data class FriendResponse(
     @SerializedName("fullName") val fullName: String? = null,
     @SerializedName("avatarUrl") val avatarUrl: String? = null,
     @SerializedName(value = "isOnline", alternate = ["online"]) val isOnline: Boolean = false,
+    @SerializedName("presenceStatus") val presenceStatus: String? = null,
     @SerializedName("lastSeen") val lastSeen: String? = null
 )
 

@@ -496,7 +496,7 @@ fun ChatRoomScreen(
         val count = groupMembers.size.takeIf { it > 0 } ?: conversation.memberCount ?: 0
         if (count > 0) "$count thành viên" else "Nhóm trò chuyện"
     } else {
-        formatPresenceLabel(conversation.isOnline, conversation.lastSeen)
+        formatPresenceLabel(conversation.isOnline, conversation.lastSeen, conversation.presenceStatus)
     }
 
     Scaffold(
@@ -522,6 +522,7 @@ fun ChatRoomScreen(
                                 avatarUrl = viewModel.resolveAssetUrl(conversation.avatarUrl),
                                 size = 40.dp,
                                 isOnline = conversation.isOnline == true,
+                                presenceStatus = conversation.presenceStatus,
                                 showOnlineBadge = !conversation.isGroup,
                                 isGroup = conversation.isGroup
                             )

@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
+import nhom3.chatbln.android.data.local.UserPresenceMode
 import nhom3.chatbln.android.ui.theme.OnlineIndicatorDark
 import nhom3.chatbln.android.ui.theme.OnlineIndicatorLight
 import java.util.Locale
@@ -33,12 +35,19 @@ fun AvatarView(
     modifier: Modifier = Modifier,
     size: Dp = 48.dp,
     isOnline: Boolean = false,
+    presenceStatus: String? = null,
     showOnlineBadge: Boolean = false,
     isGroup: Boolean = false
 ) {
     val initials = computeInitials(displayName)
     val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val onlineDotColor = if (darkTheme) OnlineIndicatorDark else OnlineIndicatorLight
+    val resolvedDotColor = when (UserPresenceMode.fromRaw(presenceStatus)) {
+        UserPresenceMode.IDLE -> Color(0xFFF59E0B)
+        UserPresenceMode.SLEEP -> Color(0xFF8B5CF6)
+        UserPresenceMode.DND -> Color(0xFFEF4444)
+        else -> onlineDotColor
+    }
 
     Box(modifier = modifier.size(size)) {
         Box(
@@ -98,7 +107,7 @@ fun AvatarView(
                     .align(Alignment.BottomEnd)
                     .size(dotSize)
                     .clip(CircleShape)
-                    .background(onlineDotColor)
+                    .background(resolvedDotColor)
                     .border(
                         width = 2.dp,
                         color = MaterialTheme.colorScheme.surface,
