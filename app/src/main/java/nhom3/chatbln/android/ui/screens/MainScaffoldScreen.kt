@@ -133,6 +133,7 @@ fun MainScaffoldScreen(
                         resolveAssetUrl = viewModel::resolveAssetUrl,
                         onSearchQueryChange = viewModel::setConversationSearchQuery,
                         onRefresh = viewModel::refreshConversations,
+                        onChangePresenceMode = viewModel::setPresenceMode,
                         onConversationClick = onOpenConversation,
                         onStartPrivateChat = { friend ->
                             viewModel.openOrCreatePrivateChat(
@@ -208,6 +209,7 @@ fun MainScaffoldScreen(
                             )
                         },
                         onToggleDarkMode = viewModel::setDarkMode,
+                        onChangePresenceMode = viewModel::setPresenceMode,
                         onUpdateServerUrl = viewModel::updateServerUrl,
                         onLogout = { viewModel.logout(onLoggedOut) }
                     )

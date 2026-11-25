@@ -86,6 +86,10 @@ class ChatRepository(
         response
     }
 
+    suspend fun markOfflineOnServer(): Result<Unit> = runCatching {
+        apiService.logout()
+    }
+
     suspend fun logout(): Result<Unit> {
         runCatching { apiService.logout() }
         sessionPreferences.clearAuthSession()

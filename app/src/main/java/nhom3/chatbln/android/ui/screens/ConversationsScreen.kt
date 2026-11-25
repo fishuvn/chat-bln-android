@@ -19,14 +19,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.UnfoldMore
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -35,6 +39,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -48,10 +53,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import nhom3.chatbln.android.data.local.UserPresenceMode
 import nhom3.chatbln.android.data.model.ConversationItemResponse
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.ui.components.AvatarView
@@ -67,13 +74,28 @@ fun ConversationsScreen(
     resolveAssetUrl: (String?) -> String?,
     onSearchQueryChange: (String) -> Unit,
     onRefresh: () -> Unit,
+    onChangePresenceMode: (UserPresenceMode) -> Unit,
     onConversationClick: (Long) -> Unit,
     onStartPrivateChat: (FriendResponse) -> Unit,
     onCreateGroupChat: (name: String, memberIds: List<Long>) -> Unit
 ) {
     var showNewChatSheet by rememberSaveable { mutableStateOf(false) }
+    var showStatusMenu by remember { mutableStateOf(false) }
     val isDarkSurface = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val connectedDotColor = if (isDarkSurface) OnlineIndicatorDark else OnlineIndicatorLight
+    val statusDotColor = when {
+        uiState.presenceMode == UserPresenceMode.OFFLINE -> MaterialTheme.colorScheme.outline
+        !uiState.isWsConnected -> Color(0xFFF59E0B)
+        uiState.presenceMode == UserPresenceMode.ONLINE -> connectedDotColor
+        uiState.presenceMode == UserPresenceMode.AWAY -> Color(0xFFEAB308)
+        uiState.presenceMode == UserPresenceMode.BUSY -> Color(0xFFEF4444)
+        else -> connectedDotColor
+    }
+    val statusLabel = when {
+        uiState.presenceMode == UserPresenceMode.OFFLINE -> "Ẩn trạng thái"
+        !uiState.isWsConnected -> "${uiState.presenceMode.title} · Đang nối..."
+        else -> uiState.presenceMode.title
+    }
 
     val filteredConversations = remember(
         uiState.conversations,
@@ -112,29 +134,67 @@ fun ConversationsScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Đoạn chat",
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (uiState.isWsConnected) {
-                                        connectedDotColor
-                                    } else {
-                                        MaterialTheme.colorScheme.outline
-                                    }
-                                )
-                        )
-                    }
+                    Text(
+                        text = "Đoạn chat",
+                        style = MaterialTheme.typography.titleLarge
+                    )
                 },
                 actions = {
+                    Box {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.clickable { showStatusMenu = true }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(9.dp)
+                                        .clip(CircleShape)
+                                        .background(statusDotColor)
+                                )
+                                Text(
+                                    text = statusLabel,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1
+                                )
+                                Icon(
+                                    imageVector = Icons.Outlined.UnfoldMore,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = showStatusMenu,
+                            onDismissRequest = { showStatusMenu = false }
+                        ) {
+                            UserPresenceMode.entries.forEach { mode ->
+                                DropdownMenuItem(
+                                    text = { Text(mode.title) },
+                                    trailingIcon = {
+                                        if (uiState.presenceMode == mode) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Check,
+                                                contentDescription = null
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        showStatusMenu = false
+                                        onChangePresenceMode(mode)
+                                    }
+                                )
+                            }
+                        }
+                    }
+
                     IconButton(onClick = onRefresh) {
                         Icon(
                             imageVector = Icons.Outlined.Refresh,

@@ -18,6 +18,19 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import nhom3.chatbln.android.data.model.CachedUser
 
+enum class UserPresenceMode(val rawValue: String, val title: String) {
+    ONLINE("online", "Trực tuyến"),
+    AWAY("away", "Tạm vắng"),
+    BUSY("busy", "Đang bận"),
+    OFFLINE("offline", "Ẩn trạng thái (Ngoại tuyến)");
+
+    companion object {
+        fun fromRaw(raw: String?): UserPresenceMode {
+            return entries.firstOrNull { it.rawValue.equals(raw, ignoreCase = true) } ?: ONLINE
+        }
+    }
+}
+
 private val Context.sessionDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "chat_bln_session_prefs"
 )
@@ -56,6 +69,10 @@ class SessionPreferences(context: Context) {
 
     val darkModeFlow: Flow<Boolean?> = appContext.sessionDataStore.data.map { prefs ->
         prefs[KEY_DARK_MODE]
+    }
+
+    val presenceModeFlow: Flow<UserPresenceMode> = appContext.sessionDataStore.data.map { prefs ->
+        UserPresenceMode.fromRaw(prefs[KEY_PRESENCE_MODE])
     }
 
     val serverBaseUrlFlow: Flow<String> = appContext.sessionDataStore.data.map { prefs ->
@@ -103,6 +120,12 @@ class SessionPreferences(context: Context) {
         }
     }
 
+    suspend fun setPresenceMode(mode: UserPresenceMode) {
+        appContext.sessionDataStore.edit { prefs ->
+            prefs[KEY_PRESENCE_MODE] = mode.rawValue
+        }
+    }
+
     suspend fun setServerBaseUrl(rawUrl: String): String {
         val normalized = normalizeServerUrl(rawUrl)
         currentBaseUrl = normalized
@@ -132,6 +155,7 @@ class SessionPreferences(context: Context) {
         private val KEY_AUTH_TOKEN = stringPreferencesKey("auth_token")
         private val KEY_CACHED_USER = stringPreferencesKey("cached_user_json")
         private val KEY_DARK_MODE = booleanPreferencesKey("dark_mode")
+        private val KEY_PRESENCE_MODE = stringPreferencesKey("presence_mode")
         private val KEY_SERVER_BASE_URL = stringPreferencesKey("server_base_url")
 
         fun normalizeServerUrl(input: String?): String {

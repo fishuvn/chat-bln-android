@@ -61,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import nhom3.chatbln.android.data.local.UserPresenceMode
 import nhom3.chatbln.android.ui.components.AvatarView
 import nhom3.chatbln.android.ui.components.ServerUrlDialog
 import nhom3.chatbln.android.ui.viewmodel.MainChatUiState
@@ -84,6 +85,7 @@ fun ProfileScreen(
         avatarUrl: String?
     ) -> Unit,
     onToggleDarkMode: (Boolean) -> Unit,
+    onChangePresenceMode: (UserPresenceMode) -> Unit,
     onUpdateServerUrl: (String) -> Unit,
     onLogout: () -> Unit
 ) {
@@ -239,7 +241,7 @@ fun ProfileScreen(
                         displayName = fullName.ifBlank { username.ifBlank { "U" } },
                         avatarUrl = resolveAssetUrl(rawAvatarUrl),
                         size = 76.dp,
-                        isOnline = true,
+                        isOnline = uiState.presenceMode != UserPresenceMode.OFFLINE,
                         showOnlineBadge = true
                     )
                     Spacer(modifier = Modifier.width(16.dp))
@@ -286,6 +288,28 @@ fun ProfileScreen(
                                 Text("Đổi ảnh đại diện")
                             }
                         }
+                    }
+                }
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                )
+
+                Text(
+                    text = "Trạng thái hoạt động",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    UserPresenceMode.entries.forEach { mode ->
+                        FilterChip(
+                            selected = uiState.presenceMode == mode,
+                            onClick = { onChangePresenceMode(mode) },
+                            label = { Text(mode.title) }
+                        )
                     }
                 }
 

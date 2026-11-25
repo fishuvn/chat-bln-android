@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nhom3.chatbln.android.AppContainer
 import nhom3.chatbln.android.data.local.SessionPreferences
+import nhom3.chatbln.android.data.local.UserPresenceMode
 import nhom3.chatbln.android.data.model.CachedUser
 import nhom3.chatbln.android.data.model.ConversationItemResponse
 import nhom3.chatbln.android.data.model.FriendResponse
@@ -40,8 +41,9 @@ enum class UserRelationshipState {
 data class MainChatUiState(
     val currentUser: CachedUser? = null,
     val profile: UserProfileResponse? = null,
-    val serverBaseUrl: String = SessionPreferences.DEFAULT_EMULATOR_BASE_URL,
+    val serverBaseUrl: String = SessionPreferences.DEFAULT_PRODUCTION_BASE_URL,
     val darkModePreference: Boolean? = null,
+    val presenceMode: UserPresenceMode = UserPresenceMode.ONLINE,
     val isWsConnected: Boolean = false,
     val conversations: List<ConversationItemResponse> = emptyList(),
     val unreadCounts: Map<Long, Int> = emptyMap(),
@@ -110,12 +112,20 @@ class MainChatViewModel(
                 val username = cachedUser?.username
                 if (!username.isNullOrBlank() && initializedForUsername != username) {
                     initializedForUsername = username
-                    stompClient.connect(username)
+                    if (_uiState.value.presenceMode != UserPresenceMode.OFFLINE) {
+                        stompClient.connect(username)
+                    }
                     refreshAll()
                 } else if (username.isNullOrBlank()) {
                     initializedForUsername = null
                     stompClient.disconnect()
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            sessionPreferences.presenceModeFlow.collectLatest { mode ->
+                _uiState.update { it.copy(presenceMode = mode) }
             }
         }
 
@@ -850,6 +860,21 @@ class MainChatViewModel(
     fun setDarkMode(enabled: Boolean) {
         viewModelScope.launch {
             sessionPreferences.setDarkMode(enabled)
+        }
+    }
+
+    fun setPresenceMode(mode: UserPresenceMode) {
+        viewModelScope.launch {
+            sessionPreferences.setPresenceMode(mode)
+            _uiState.update { it.copy(presenceMode = mode) }
+            val username = _uiState.value.currentUser?.username ?: initializedForUsername
+            if (mode == UserPresenceMode.OFFLINE) {
+                stompClient.disconnect()
+                repository.markOfflineOnServer()
+            } else if (!username.isNullOrBlank()) {
+                stompClient.connect(username)
+                refreshConversations()
+            }
         }
     }
 
