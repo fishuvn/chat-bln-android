@@ -188,7 +188,7 @@ data class FriendResponse(
     @SerializedName("username") val username: String,
     @SerializedName("fullName") val fullName: String? = null,
     @SerializedName("avatarUrl") val avatarUrl: String? = null,
-    @SerializedName(value = "isOnline", alternate = ["online"]) val isOnline: Boolean? = false,
+    @SerializedName(value = "isOnline", alternate = ["online"]) val isOnline: Boolean = false,
     @SerializedName("lastSeen") val lastSeen: String? = null
 )
 
