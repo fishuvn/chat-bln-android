@@ -55,8 +55,15 @@ fun AvatarView(
             contentAlignment = Alignment.Center
         ) {
             if (!avatarUrl.isNullOrBlank()) {
+                val imageModel: Any = if (avatarUrl.startsWith("data:", ignoreCase = true) && avatarUrl.contains("base64,")) {
+                    runCatching {
+                        android.util.Base64.decode(avatarUrl.substringAfter("base64,"), android.util.Base64.DEFAULT)
+                    }.getOrNull() ?: avatarUrl
+                } else {
+                    avatarUrl
+                }
                 SubcomposeAsyncImage(
-                    model = avatarUrl,
+                    model = imageModel,
                     contentDescription = displayName,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),

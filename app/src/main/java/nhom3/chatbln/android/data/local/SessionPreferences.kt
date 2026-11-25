@@ -33,7 +33,7 @@ class SessionPreferences(context: Context) {
         private set
 
     @Volatile
-    var currentBaseUrl: String = DEFAULT_EMULATOR_BASE_URL
+    var currentBaseUrl: String = DEFAULT_PRODUCTION_BASE_URL
         private set
 
     init {
@@ -125,6 +125,7 @@ class SessionPreferences(context: Context) {
     }
 
     companion object {
+        const val DEFAULT_PRODUCTION_BASE_URL = "https://chat-bln.fishu.io.vn"
         const val DEFAULT_EMULATOR_BASE_URL = "http://10.0.2.2:8088"
         const val RETROFIT_PLACEHOLDER_API_URL = "http://10.0.2.2:8088/api/"
 
@@ -135,7 +136,7 @@ class SessionPreferences(context: Context) {
 
         fun normalizeServerUrl(input: String?): String {
             val trimmed = input?.trim().orEmpty()
-            if (trimmed.isEmpty()) return DEFAULT_EMULATOR_BASE_URL
+            if (trimmed.isEmpty()) return DEFAULT_PRODUCTION_BASE_URL
 
             val withScheme = if (
                 trimmed.startsWith("http://", ignoreCase = true) ||
@@ -143,15 +144,38 @@ class SessionPreferences(context: Context) {
             ) {
                 trimmed
             } else {
-                "http://$trimmed"
+                val scheme = if (shouldDefaultToCleartextHttp(trimmed)) "http" else "https"
+                "$scheme://$trimmed"
             }
 
-            return withScheme
+            val cleaned = withScheme
                 .trimEnd('/')
                 .removeSuffix("/api")
                 .removeSuffix("/ws-native")
                 .trimEnd('/')
-                .ifEmpty { DEFAULT_EMULATOR_BASE_URL }
+                .ifEmpty { DEFAULT_PRODUCTION_BASE_URL }
+
+            return if (cleaned.equals("http://chat-bln.fishu.io.vn", ignoreCase = true)) {
+                DEFAULT_PRODUCTION_BASE_URL
+            } else {
+                cleaned
+            }
+        }
+
+        private fun shouldDefaultToCleartextHttp(rawHostPort: String): Boolean {
+            val hostPort = rawHostPort.substringBefore('/').lowercase()
+            if (hostPort.contains(":8088") || hostPort.contains(":8080") || hostPort.contains(":4200")) {
+                return true
+            }
+            val hostOnly = hostPort.substringBefore(':')
+            if (hostOnly == "localhost" || hostOnly.endsWith(".local")) {
+                return true
+            }
+            val octets = hostOnly.split('.')
+            if (octets.size == 4 && octets.all { it.toIntOrNull() != null }) {
+                return true
+            }
+            return false
         }
     }
 }

@@ -231,6 +231,7 @@ class ChatRepository(
         if (
             trimmed.startsWith("http://", ignoreCase = true) ||
             trimmed.startsWith("https://", ignoreCase = true) ||
+            trimmed.startsWith("data:", ignoreCase = true) ||
             trimmed.startsWith("content://", ignoreCase = true) ||
             trimmed.startsWith("file://", ignoreCase = true)
         ) {

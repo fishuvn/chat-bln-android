@@ -43,7 +43,7 @@ fun ServerUrlDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "Nhập địa chỉ Backend Spring Boot (cổng 8088). Trên máy ảo Android dùng 10.0.2.2; trên điện thoại thật dùng IP LAN của máy tính.",
+                    text = "Mặc định kết nối HTTPS tới https://chat-bln.fishu.io.vn. Khi test cục bộ dùng 10.0.2.2:8088 (máy ảo) hoặc IP LAN của máy tính.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -52,7 +52,7 @@ fun ServerUrlDialog(
                     value = draftUrl,
                     onValueChange = { draftUrl = it },
                     label = { Text("Server Base URL") },
-                    placeholder = { Text("http://192.168.1.10:8088") },
+                    placeholder = { Text("https://chat-bln.fishu.io.vn") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Uri,
@@ -66,16 +66,16 @@ fun ServerUrlDialog(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     AssistChip(
+                        onClick = { draftUrl = SessionPreferences.DEFAULT_PRODUCTION_BASE_URL },
+                        label = { Text("Cloudflare (chat-bln)") }
+                    )
+                    AssistChip(
                         onClick = { draftUrl = SessionPreferences.DEFAULT_EMULATOR_BASE_URL },
                         label = { Text("Máy ảo (10.0.2.2)") }
                     )
                     AssistChip(
                         onClick = { draftUrl = "http://192.168.1.10:8088" },
                         label = { Text("Mẫu LAN Wi-Fi") }
-                    )
-                    AssistChip(
-                        onClick = { draftUrl = "http://127.0.0.1:8088" },
-                        label = { Text("ADB Reverse") }
                     )
                 }
             }
