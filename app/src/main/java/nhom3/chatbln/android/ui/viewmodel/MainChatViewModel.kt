@@ -889,7 +889,7 @@ class MainChatViewModel(
                 onFailure = { err ->
                     _uiState.update {
                         it.copy(
-                            sendingFriendRequestUserIds = state.sendingFriendRequestUserIds - targetUserId,
+                            sendingFriendRequestUserIds = it.sendingFriendRequestUserIds - targetUserId,
                             snackbarMessage = err.message ?: "Không thể gửi lời mời kết bạn."
                         )
                     }
