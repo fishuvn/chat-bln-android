@@ -54,7 +54,8 @@ fun FriendRequestsScreen(
     resolveAssetUrl: (String?) -> String?,
     onRefresh: () -> Unit,
     onAccept: (FriendshipResponse) -> Unit,
-    onReject: (FriendshipResponse) -> Unit
+    onReject: (FriendshipResponse) -> Unit,
+    onCancelSent: (FriendshipResponse) -> Unit = {}
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
@@ -222,11 +223,17 @@ fun FriendRequestsScreen(
                             contentPadding = PaddingValues(vertical = 8.dp)
                         ) {
                             items(items = uiState.sentRequests, key = { it.id }) { req ->
+                                val isProcessing = uiState.processingRequestIds.contains(req.id)
                                 val knownTarget = uiState.knownUsersById[req.addresseeId]
-                                val targetName = knownTarget?.fullName?.takeIf { it.isNotBlank() }
+                                val targetName = req.addresseeFullName?.takeIf { it.isNotBlank() }
+                                    ?: knownTarget?.fullName?.takeIf { it.isNotBlank() }
+                                    ?: req.addresseeUsername?.takeIf { it.isNotBlank() }
                                     ?: knownTarget?.username
                                     ?: "Người nhận #${req.addresseeId}"
-                                val targetUsername = knownTarget?.username?.let { "@$it" }
+                                val targetUsername = (req.addresseeUsername?.takeIf { it.isNotBlank() }
+                                    ?: knownTarget?.username)
+                                    ?.let { "@$it" }
+                                val targetAvatar = req.addresseeAvatarUrl ?: knownTarget?.avatarUrl
                                 val timeText = formatMessageTime(req.createdAt)
 
                                 Row(
@@ -237,7 +244,7 @@ fun FriendRequestsScreen(
                                 ) {
                                     AvatarView(
                                         displayName = targetName,
-                                        avatarUrl = resolveAssetUrl(knownTarget?.avatarUrl),
+                                        avatarUrl = resolveAssetUrl(targetAvatar),
                                         size = 46.dp
                                     )
                                     Spacer(modifier = Modifier.width(12.dp))
@@ -261,11 +268,20 @@ fun FriendRequestsScreen(
                                         }
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Đang chờ",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                                    OutlinedButton(
+                                        onClick = { onCancelSent(req) },
+                                        enabled = !isProcessing,
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        if (isProcessing) {
+                                            CircularProgressIndicator(
+                                                strokeWidth = 2.dp,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        } else {
+                                            Text("Thu hồi")
+                                        }
+                                    }
                                 }
                                 HorizontalDivider(
                                     modifier = Modifier.padding(start = 74.dp, end = 16.dp),

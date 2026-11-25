@@ -818,6 +818,51 @@ class MainChatViewModel(
         }
     }
 
+    fun cancelSentFriendRequest(request: FriendshipResponse) {
+        if (_uiState.value.processingRequestIds.contains(request.id)) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(processingRequestIds = it.processingRequestIds + request.id) }
+            repository.cancelSentFriendRequest(request.id).fold(
+                onSuccess = {
+                    _uiState.update { state ->
+                        val targetId = request.addresseeId
+                        val updatedKnown = state.knownUsersById.toMutableMap()
+                        updatedKnown[targetId]?.let { existing ->
+                            updatedKnown[targetId] = existing.copy(friendshipStatus = null)
+                        }
+                        val updatedSearch = state.userSearchResults.map { item ->
+                            if (item.id == targetId) item.copy(friendshipStatus = null) else item
+                        }
+                        val updatedConvs = state.conversations.map { conv ->
+                            if (!conv.isGroup && conv.targetUserId == targetId) {
+                                conv.copy(friendshipStatus = null)
+                            } else {
+                                conv
+                            }
+                        }
+                        state.copy(
+                            processingRequestIds = state.processingRequestIds - request.id,
+                            sentRequests = state.sentRequests.filterNot { it.id == request.id },
+                            knownUsersById = updatedKnown,
+                            userSearchResults = updatedSearch,
+                            conversations = updatedConvs,
+                            snackbarMessage = "Đã thu hồi lời mời kết bạn."
+                        )
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            processingRequestIds = it.processingRequestIds - request.id,
+                            snackbarMessage = err.message ?: "Không thể thu hồi lời mời."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
     fun loadConversationMembers(conversationId: Long) {
         viewModelScope.launch {
             repository.getConversationMembers(conversationId).onSuccess { members ->

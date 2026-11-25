@@ -205,6 +205,11 @@ class ChatRepository(
         apiService.rejectFriendRequest(friendshipId = friendshipId)
     }
 
+    suspend fun cancelSentFriendRequest(friendshipId: Long): Result<Unit> = safeApiCall {
+        apiService.cancelSentFriendRequest(friendshipId = friendshipId)
+        Unit
+    }
+
     suspend fun unfriend(targetUserId: Long): Result<Unit> = safeApiCall {
         apiService.unfriend(targetUserId)
         Unit

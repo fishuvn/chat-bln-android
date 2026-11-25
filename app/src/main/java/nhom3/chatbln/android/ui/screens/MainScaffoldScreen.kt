@@ -193,7 +193,8 @@ fun MainScaffoldScreen(
                         resolveAssetUrl = viewModel::resolveAssetUrl,
                         onRefresh = viewModel::refreshFriendsAndRequests,
                         onAccept = viewModel::acceptFriendRequest,
-                        onReject = viewModel::rejectFriendRequest
+                        onReject = viewModel::rejectFriendRequest,
+                        onCancelSent = viewModel::cancelSentFriendRequest
                     )
                 }
 

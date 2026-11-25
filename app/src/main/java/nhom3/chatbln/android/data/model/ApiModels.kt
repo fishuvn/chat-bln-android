@@ -248,6 +248,9 @@ data class FriendshipResponse(
     @SerializedName("requesterFullName") val requesterFullName: String? = null,
     @SerializedName("requesterAvatarUrl") val requesterAvatarUrl: String? = null,
     @SerializedName("addresseeId") val addresseeId: Long,
+    @SerializedName("addresseeUsername") val addresseeUsername: String? = null,
+    @SerializedName("addresseeFullName") val addresseeFullName: String? = null,
+    @SerializedName("addresseeAvatarUrl") val addresseeAvatarUrl: String? = null,
     @SerializedName("status") val status: String = "PENDING",
     @SerializedName("createdAt") val createdAt: String? = null
 )

@@ -122,6 +122,11 @@ interface ChatBlnApiService {
         @Body emptyBody: Map<String, String> = emptyMap()
     ): FriendshipResponse
 
+    @DELETE("friends/requests/{id}")
+    suspend fun cancelSentFriendRequest(
+        @Path("id") friendshipId: Long
+    ): Map<String, Any>
+
     @DELETE("friends/{targetUserId}")
     suspend fun unfriend(
         @Path("targetUserId") targetUserId: Long
