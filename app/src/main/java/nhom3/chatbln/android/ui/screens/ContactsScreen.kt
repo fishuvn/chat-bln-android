@@ -124,6 +124,8 @@ fun ContactsScreen(
             isSearching = uiState.isSearchingUsers,
             results = uiState.userSearchResults,
             sendingUserIds = uiState.sendingFriendRequestUserIds,
+            feedbackMessage = uiState.addFriendFeedback,
+            isFeedbackError = uiState.addFriendFeedbackIsError,
             resolveAssetUrl = resolveAssetUrl,
             resolveRelationship = resolveRelationship,
             onKeywordChange = onUserSearchKeywordChange,

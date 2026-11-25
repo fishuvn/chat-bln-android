@@ -77,6 +77,8 @@ data class MainChatUiState(
     val isSearchingUsers: Boolean = false,
     val userSearchResults: List<UserSearchResponse> = emptyList(),
     val sendingFriendRequestUserIds: Set<Long> = emptySet(),
+    val addFriendFeedback: String? = null,
+    val addFriendFeedbackIsError: Boolean = false,
     val isSavingProfile: Boolean = false,
     val isUploadingAvatar: Boolean = false,
     val isCreatingConversation: Boolean = false,
@@ -635,13 +637,30 @@ class MainChatViewModel(
             repository.searchUsers(normalized).fold(
                 onSuccess = { users ->
                     _uiState.update { state ->
+                        val clearedIds = users
+                            .filter {
+                                it.isFriend != true &&
+                                    !it.friendshipStatus.equals("PENDING", ignoreCase = true)
+                            }
+                            .map { it.id }
+                            .toSet()
                         val mergedKnown = state.knownUsersById.toMutableMap()
                         users.forEach { u -> mergedKnown[u.id] = u }
                         state.copy(
                             isSearchingUsers = false,
                             hasSearchedUsers = true,
                             userSearchResults = users,
-                            knownUsersById = mergedKnown
+                            knownUsersById = mergedKnown,
+                            sentRequests = if (clearedIds.isEmpty()) {
+                                state.sentRequests
+                            } else {
+                                state.sentRequests.filterNot { it.addresseeId in clearedIds }
+                            },
+                            receivedRequests = if (clearedIds.isEmpty()) {
+                                state.receivedRequests
+                            } else {
+                                state.receivedRequests.filterNot { it.requesterId in clearedIds }
+                            }
                         )
                     }
                 },
@@ -661,12 +680,14 @@ class MainChatViewModel(
 
     fun resetUserSearch() {
         searchDebounceJob?.cancel()
-        _uiState.update {
-            it.copy(
+        _uiState.update { state ->
+            state.copy(
                 userSearchKeyword = "",
                 hasSearchedUsers = false,
                 isSearchingUsers = false,
-                userSearchResults = emptyList()
+                userSearchResults = emptyList(),
+                addFriendFeedback = null,
+                addFriendFeedbackIsError = false
             )
         }
     }
@@ -699,9 +720,11 @@ class MainChatViewModel(
         if (_uiState.value.sendingFriendRequestUserIds.contains(user.id)) return
 
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    sendingFriendRequestUserIds = it.sendingFriendRequestUserIds + user.id
+            _uiState.update { state ->
+                state.copy(
+                    sendingFriendRequestUserIds = state.sendingFriendRequestUserIds + user.id,
+                    addFriendFeedback = null,
+                    addFriendFeedbackIsError = false
                 )
             }
             repository.sendFriendRequest(user.id).fold(
@@ -709,19 +732,29 @@ class MainChatViewModel(
                     _uiState.update { state ->
                         val updatedKnown = state.knownUsersById.toMutableMap()
                         updatedKnown[user.id] = user.copy(friendshipStatus = "PENDING")
+                        val updatedResults = state.userSearchResults.map { item ->
+                            if (item.id == user.id) item.copy(friendshipStatus = "PENDING") else item
+                        }
+                        val msg = "Đã gửi lời mời kết bạn tới ${user.fullName ?: user.username}."
                         state.copy(
                             sendingFriendRequestUserIds = state.sendingFriendRequestUserIds - user.id,
                             sentRequests = listOf(friendship) + state.sentRequests.filterNot { it.id == friendship.id },
+                            userSearchResults = updatedResults,
                             knownUsersById = updatedKnown,
-                            snackbarMessage = "Đã gửi lời mời kết bạn tới ${user.fullName ?: user.username}."
+                            addFriendFeedback = msg,
+                            addFriendFeedbackIsError = false,
+                            snackbarMessage = msg
                         )
                     }
                 },
                 onFailure = { err ->
-                    _uiState.update {
-                        it.copy(
-                            sendingFriendRequestUserIds = it.sendingFriendRequestUserIds - user.id,
-                            snackbarMessage = err.message ?: "Không thể gửi lời mời kết bạn."
+                    val errMsg = err.message ?: "Không thể gửi lời mời kết bạn."
+                    _uiState.update { state ->
+                        state.copy(
+                            sendingFriendRequestUserIds = state.sendingFriendRequestUserIds - user.id,
+                            addFriendFeedback = errMsg,
+                            addFriendFeedbackIsError = true,
+                            snackbarMessage = errMsg
                         )
                     }
                 }

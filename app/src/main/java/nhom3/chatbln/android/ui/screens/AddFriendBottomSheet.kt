@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -54,6 +55,8 @@ fun AddFriendBottomSheet(
     isSearching: Boolean,
     results: List<UserSearchResponse>,
     sendingUserIds: Set<Long>,
+    feedbackMessage: String? = null,
+    isFeedbackError: Boolean = false,
     resolveAssetUrl: (String?) -> String?,
     resolveRelationship: (UserSearchResponse) -> UserRelationshipState,
     onKeywordChange: (String) -> Unit,
@@ -107,6 +110,29 @@ fun AddFriendBottomSheet(
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
+
+            if (!feedbackMessage.isNullOrBlank()) {
+                Surface(
+                    color = if (isFeedbackError) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = feedbackMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isFeedbackError) {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        } else {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        },
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                    )
+                }
+            }
 
             // Explicitly hide system users until a non-blank search keyword is entered
             when {
