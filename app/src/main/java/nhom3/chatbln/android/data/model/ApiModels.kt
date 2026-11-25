@@ -105,11 +105,30 @@ data class ConversationItemResponse(
     @SerializedName("lastMessage") val lastMessage: String? = null,
     @SerializedName("lastMessageSenderName") val lastMessageSenderName: String? = null,
     @SerializedName("lastMessageSenderUsername") val lastMessageSenderUsername: String? = null,
-    @SerializedName("lastMessageTime") val lastMessageTime: String? = null
+    @SerializedName("lastMessageTime") val lastMessageTime: String? = null,
+    @SerializedName("currentUserRole") val currentUserRole: String? = null
 ) {
     val isGroup: Boolean
         get() = type.equals("GROUP", ignoreCase = true)
+
+    val isCurrentUserGroupAdmin: Boolean
+        get() = currentUserRole.equals("ADMIN", ignoreCase = true)
 }
+
+data class DeleteMessagesRequest(
+    @SerializedName("messageIds") val messageIds: List<Long>,
+    @SerializedName("mode") val mode: String
+)
+
+data class DeleteMessagesResponse(
+    @SerializedName("conversationId") val conversationId: Long,
+    @SerializedName("mode") val mode: String? = null,
+    @SerializedName("deletedIds") val deletedIds: List<Long> = emptyList(),
+    @SerializedName("lastMessage") val lastMessage: String? = null,
+    @SerializedName("lastMessageSenderName") val lastMessageSenderName: String? = null,
+    @SerializedName("lastMessageSenderUsername") val lastMessageSenderUsername: String? = null,
+    @SerializedName("lastMessageTime") val lastMessageTime: String? = null
+)
 
 data class CreatePrivateConversationRequest(
     @SerializedName("targetUserId") val targetUserId: Long

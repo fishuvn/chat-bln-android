@@ -5,6 +5,8 @@ import nhom3.chatbln.android.data.model.ConversationItemResponse
 import nhom3.chatbln.android.data.model.ConversationResponse
 import nhom3.chatbln.android.data.model.CreateGroupConversationRequest
 import nhom3.chatbln.android.data.model.CreatePrivateConversationRequest
+import nhom3.chatbln.android.data.model.DeleteMessagesRequest
+import nhom3.chatbln.android.data.model.DeleteMessagesResponse
 import nhom3.chatbln.android.data.model.FriendRequestDto
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.data.model.FriendshipResponse
@@ -79,6 +81,12 @@ interface ChatBlnApiService {
         @Path("id") conversationId: Long,
         @Body request: SendMessageRequest
     ): MessageDto
+
+    @POST("conversations/{id}/messages/delete")
+    suspend fun deleteMessages(
+        @Path("id") conversationId: Long,
+        @Body request: DeleteMessagesRequest
+    ): DeleteMessagesResponse
 
     @Multipart
     @POST("uploads")

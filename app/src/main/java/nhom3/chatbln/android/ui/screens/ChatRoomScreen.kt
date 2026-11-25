@@ -3,8 +3,10 @@ package nhom3.chatbln.android.ui.screens
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,17 +33,25 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.PlayCircleOutline
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SentimentSatisfiedAlt
 import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -58,6 +68,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -114,8 +125,14 @@ fun ChatRoomScreen(
     var showInfoSheet by rememberSaveable { mutableStateOf(false) }
     var showSearchBar by rememberSaveable { mutableStateOf(false) }
     var previewImageUrl by rememberSaveable { mutableStateOf<String?>(null) }
+    var isSelectionMode by rememberSaveable { mutableStateOf(false) }
+    var selectedMessageIds by remember { mutableStateOf(setOf<Long>()) }
+    var pendingDeleteIds by remember { mutableStateOf<List<Long>>(emptyList()) }
 
     LaunchedEffect(conversationId) {
+        isSelectionMode = false
+        selectedMessageIds = emptySet()
+        pendingDeleteIds = emptyList()
         viewModel.openConversation(conversationId)
     }
 
@@ -140,6 +157,16 @@ fun ChatRoomScreen(
 
     val allMessages = uiState.messagesByConversation[conversationId].orEmpty()
     val hasMore = uiState.hasMoreByConversation[conversationId] == true
+
+    LaunchedEffect(allMessages) {
+        if (selectedMessageIds.isNotEmpty()) {
+            val existingIds = allMessages.map { it.id }.toHashSet()
+            val pruned = selectedMessageIds.intersect(existingIds)
+            if (pruned.size != selectedMessageIds.size) {
+                selectedMessageIds = pruned
+            }
+        }
+    }
 
     val visibleMessages = remember(allMessages, showSearchBar, uiState.inChatSearchQuery) {
         val q = uiState.inChatSearchQuery.trim()
@@ -248,6 +275,140 @@ fun ChatRoomScreen(
         )
     }
 
+    if (pendingDeleteIds.isNotEmpty()) {
+        val currentUsername = uiState.currentUser?.username
+        val targetMessages = remember(pendingDeleteIds, allMessages) {
+            val idSet = pendingDeleteIds.toHashSet()
+            allMessages.filter { it.id in idSet }
+        }
+        val allPendingMine = targetMessages.isNotEmpty() && targetMessages.all { msg ->
+            msg.sender.username.equals(currentUsername, ignoreCase = true)
+        }
+        val canDeleteForEveryone = !conversation.isGroup ||
+            conversation.isCurrentUserGroupAdmin ||
+            allPendingMine
+
+        AlertDialog(
+            onDismissRequest = {
+                if (!uiState.isDeletingMessages) {
+                    pendingDeleteIds = emptyList()
+                }
+            },
+            title = {
+                Text(
+                    text = if (pendingDeleteIds.size == 1) {
+                        "Xóa tin nhắn"
+                    } else {
+                        "Xóa ${pendingDeleteIds.size} tin nhắn đã chọn"
+                    },
+                    style = MaterialTheme.typography.titleMedium
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (canDeleteForEveryone) {
+                            "Chọn cách xóa tin nhắn trong cuộc trò chuyện này:"
+                        } else {
+                            "Trong nhóm trò chuyện, bạn chỉ có thể thu hồi tin nhắn của chính mình (hoặc khi là quản trị viên). Bạn vẫn có thể xóa ở phía mình:"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    if (canDeleteForEveryone) {
+                        Button(
+                            onClick = {
+                                val idsToDelete = pendingDeleteIds
+                                viewModel.deleteMessages(
+                                    conversationId = conversationId,
+                                    messageIds = idsToDelete,
+                                    mode = "FOR_EVERYONE"
+                                ) {
+                                    pendingDeleteIds = emptyList()
+                                    selectedMessageIds = emptySet()
+                                    isSelectionMode = false
+                                }
+                            },
+                            enabled = !uiState.isDeletingMessages,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.DeleteForever,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Thu hồi / Xóa với mọi người")
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val idsToDelete = pendingDeleteIds
+                            viewModel.deleteMessages(
+                                conversationId = conversationId,
+                                messageIds = idsToDelete,
+                                mode = "FOR_ME"
+                            ) {
+                                pendingDeleteIds = emptyList()
+                                selectedMessageIds = emptySet()
+                                isSelectionMode = false
+                            }
+                        },
+                        enabled = !uiState.isDeletingMessages,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.DeleteOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Xóa ở phía tôi")
+                    }
+
+                    if (!isSelectionMode && pendingDeleteIds.size == 1) {
+                        OutlinedButton(
+                            onClick = {
+                                val seedId = pendingDeleteIds.first()
+                                pendingDeleteIds = emptyList()
+                                isSelectionMode = true
+                                selectedMessageIds = setOf(seedId)
+                            },
+                            enabled = !uiState.isDeletingMessages,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Checklist,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Chọn nhiều tin nhắn")
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingDeleteIds = emptyList() },
+                    enabled = !uiState.isDeletingMessages
+                ) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
     previewImageUrl?.let { imageUrl ->
         Dialog(
             onDismissRequest = { previewImageUrl = null },
@@ -342,6 +503,24 @@ fun ChatRoomScreen(
                         }
                     },
                     actions = {
+                        if (allMessages.isNotEmpty() || isSelectionMode) {
+                            IconButton(
+                                onClick = {
+                                    isSelectionMode = !isSelectionMode
+                                    selectedMessageIds = emptySet()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Checklist,
+                                    contentDescription = "Chọn nhiều tin nhắn",
+                                    tint = if (isSelectionMode) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    }
+                                )
+                            }
+                        }
                         IconButton(
                             onClick = {
                                 showSearchBar = !showSearchBar
@@ -398,144 +577,215 @@ fun ChatRoomScreen(
             }
         },
         bottomBar = {
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 2.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .imePadding()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.Bottom
+            if (isSelectionMode) {
+                val visibleIds = remember(visibleMessages) { visibleMessages.map { it.id } }
+                val allVisibleSelected = visibleIds.isNotEmpty() && visibleIds.all { it in selectedMessageIds }
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    tonalElevation = 3.dp
                 ) {
-                    Box {
-                        IconButton(
-                            onClick = { showAttachmentMenu = true },
-                            enabled = !uiState.isUploadingAttachment
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TextButton(
+                            onClick = {
+                                selectedMessageIds = if (allVisibleSelected) {
+                                    selectedMessageIds - visibleIds.toSet()
+                                } else {
+                                    selectedMessageIds + visibleIds
+                                }
+                            },
+                            enabled = visibleIds.isNotEmpty()
+                        ) {
+                            Text(if (allVisibleSelected) "Bỏ chọn" else "Chọn tất cả")
+                        }
+
+                        Text(
+                            text = "Đã chọn ${selectedMessageIds.size}",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        TextButton(
+                            onClick = {
+                                isSelectionMode = false
+                                selectedMessageIds = emptySet()
+                            }
+                        ) {
+                            Text("Hủy")
+                        }
+
+                        Button(
+                            onClick = {
+                                if (selectedMessageIds.isNotEmpty()) {
+                                    pendingDeleteIds = selectedMessageIds.toList()
+                                }
+                            },
+                            enabled = selectedMessageIds.isNotEmpty() && !uiState.isDeletingMessages,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            ),
+                            shape = RoundedCornerShape(14.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.AddCircleOutline,
-                                contentDescription = "Đính kèm",
-                                tint = MaterialTheme.colorScheme.primary
+                                imageVector = Icons.Outlined.DeleteOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
                             )
-                        }
-
-                        DropdownMenu(
-                            expanded = showAttachmentMenu,
-                            onDismissRequest = { showAttachmentMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Chọn gửi ảnh") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Image,
-                                        contentDescription = null
-                                    )
-                                },
-                                onClick = {
-                                    showAttachmentMenu = false
-                                    pickImageLauncher.launch(
-                                        PickVisualMediaRequest(
-                                            ActivityResultContracts.PickVisualMedia.ImageOnly
-                                        )
-                                    )
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Chọn gửi video") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Videocam,
-                                        contentDescription = null
-                                    )
-                                },
-                                onClick = {
-                                    showAttachmentMenu = false
-                                    pickVideoLauncher.launch(
-                                        PickVisualMediaRequest(
-                                            ActivityResultContracts.PickVisualMedia.VideoOnly
-                                        )
-                                    )
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Đính kèm tệp") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.AttachFile,
-                                        contentDescription = null
-                                    )
-                                },
-                                onClick = {
-                                    showAttachmentMenu = false
-                                    pickDocumentLauncher.launch(arrayOf("*/*"))
-                                }
-                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Xóa (${selectedMessageIds.size})")
                         }
                     }
+                }
+            } else {
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .imePadding()
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Box {
+                            IconButton(
+                                onClick = { showAttachmentMenu = true },
+                                enabled = !uiState.isUploadingAttachment
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.AddCircleOutline,
+                                    contentDescription = "Đính kèm",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
 
-                    IconButton(onClick = { showEmojiSheet = true }) {
-                        Icon(
-                            imageVector = Icons.Outlined.SentimentSatisfiedAlt,
-                            contentDescription = "Chọn emoji",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            DropdownMenu(
+                                expanded = showAttachmentMenu,
+                                onDismissRequest = { showAttachmentMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Chọn gửi ảnh") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Image,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    onClick = {
+                                        showAttachmentMenu = false
+                                        pickImageLauncher.launch(
+                                            PickVisualMediaRequest(
+                                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                                            )
+                                        )
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Chọn gửi video") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Videocam,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    onClick = {
+                                        showAttachmentMenu = false
+                                        pickVideoLauncher.launch(
+                                            PickVisualMediaRequest(
+                                                ActivityResultContracts.PickVisualMedia.VideoOnly
+                                            )
+                                        )
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Đính kèm tệp") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.AttachFile,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    onClick = {
+                                        showAttachmentMenu = false
+                                        pickDocumentLauncher.launch(arrayOf("*/*"))
+                                    }
+                                )
+                            }
+                        }
+
+                        IconButton(onClick = { showEmojiSheet = true }) {
+                            Icon(
+                                imageVector = Icons.Outlined.SentimentSatisfiedAlt,
+                                contentDescription = "Chọn emoji",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value = composerValue,
+                            onValueChange = { composerValue = it },
+                            placeholder = { Text("Nhập tin nhắn...") },
+                            maxLines = 4,
+                            shape = RoundedCornerShape(22.dp),
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Sentences,
+                                imeAction = ImeAction.Send
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onSend = {
+                                    val textToSend = composerValue.text
+                                    if (textToSend.isNotBlank() && !uiState.isSendingMessage) {
+                                        composerValue = TextFieldValue("")
+                                        viewModel.sendTextMessage(
+                                            conversationId = conversationId,
+                                            rawText = textToSend
+                                        )
+                                    }
+                                }
+                            ),
+                            modifier = Modifier.weight(1f)
                         )
-                    }
 
-                    OutlinedTextField(
-                        value = composerValue,
-                        onValueChange = { composerValue = it },
-                        placeholder = { Text("Nhập tin nhắn...") },
-                        maxLines = 4,
-                        shape = RoundedCornerShape(22.dp),
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Sentences,
-                            imeAction = ImeAction.Send
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onSend = {
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        val canSend = composerValue.text.isNotBlank() && !uiState.isSendingMessage
+                        FilledIconButton(
+                            onClick = {
                                 val textToSend = composerValue.text
-                                if (textToSend.isNotBlank() && !uiState.isSendingMessage) {
+                                if (textToSend.isNotBlank()) {
                                     composerValue = TextFieldValue("")
                                     viewModel.sendTextMessage(
                                         conversationId = conversationId,
                                         rawText = textToSend
                                     )
                                 }
-                            }
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    val canSend = composerValue.text.isNotBlank() && !uiState.isSendingMessage
-                    FilledIconButton(
-                        onClick = {
-                            val textToSend = composerValue.text
-                            if (textToSend.isNotBlank()) {
-                                composerValue = TextFieldValue("")
-                                viewModel.sendTextMessage(
-                                    conversationId = conversationId,
-                                    rawText = textToSend
+                            },
+                            enabled = canSend
+                        ) {
+                            if (uiState.isSendingMessage) {
+                                CircularProgressIndicator(
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.Send,
+                                    contentDescription = "Gửi tin nhắn"
                                 )
                             }
-                        },
-                        enabled = canSend
-                    ) {
-                        if (uiState.isSendingMessage) {
-                            CircularProgressIndicator(
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.Send,
-                                contentDescription = "Gửi tin nhắn"
-                            )
                         }
                     }
                 }
@@ -616,9 +866,22 @@ fun ChatRoomScreen(
                                 uiState.currentUser?.username,
                                 ignoreCase = true
                             )
+                            val isSelected = message.id in selectedMessageIds
                             MessageBubbleItem(
                                 message = message,
                                 isMe = isMe,
+                                isSelectionMode = isSelectionMode,
+                                isSelected = isSelected,
+                                onToggleSelect = {
+                                    selectedMessageIds = if (isSelected) {
+                                        selectedMessageIds - message.id
+                                    } else {
+                                        selectedMessageIds + message.id
+                                    }
+                                },
+                                onLongPressMessage = {
+                                    pendingDeleteIds = listOf(message.id)
+                                },
                                 resolveAssetUrl = viewModel::resolveAssetUrl,
                                 onPreviewImage = { previewImageUrl = it }
                             )
@@ -630,10 +893,15 @@ fun ChatRoomScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageBubbleItem(
     message: MessageDto,
     isMe: Boolean,
+    isSelectionMode: Boolean,
+    isSelected: Boolean,
+    onToggleSelect: () -> Unit,
+    onLongPressMessage: () -> Unit,
     resolveAssetUrl: (String?) -> String?,
     onPreviewImage: (String) -> Unit
 ) {
@@ -681,132 +949,272 @@ private fun MessageBubbleItem(
         MaterialTheme.colorScheme.primary
     }
 
+    val rowBackground = if (isSelectionMode && isSelected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+    } else {
+        Color.Transparent
+    }
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
-        verticalAlignment = Alignment.Bottom
-    ) {
-        if (!isMe) {
-            AvatarView(
-                displayName = senderLabel,
-                avatarUrl = resolveAssetUrl(message.sender.avatarUrl),
-                size = 32.dp
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-        }
-
-        Column(
-            horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
-            modifier = Modifier.widthIn(max = 300.dp)
-        ) {
-            // Sender name header shown cleanly for both group and private conversations
-            Text(
-                text = senderLabel,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-            )
-
-            Surface(
-                color = bubbleContainerColor,
-                contentColor = bubbleTextColor,
-                shape = RoundedCornerShape(
-                    topStart = 18.dp,
-                    topEnd = 18.dp,
-                    bottomStart = if (isMe) 18.dp else 4.dp,
-                    bottomEnd = if (isMe) 4.dp else 18.dp
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (attachmentType == "IMAGE" && !resolvedAttachmentUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = resolvedAttachmentUrl,
-                            contentDescription = message.attachmentName ?: "Hình ảnh",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 120.dp, max = 240.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { onPreviewImage(resolvedAttachmentUrl) }
-                        )
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(rowBackground)
+            .combinedClickable(
+                onClick = {
+                    if (isSelectionMode) {
+                        onToggleSelect()
                     }
-
-                    if (attachmentType == "VIDEO" && !resolvedAttachmentUrl.isNullOrBlank()) {
-                        AttachmentActionRow(
-                            icon = Icons.Outlined.PlayCircleOutline,
-                            title = message.attachmentName?.takeIf { it.isNotBlank() }
-                                ?: "Video đính kèm",
-                            subtitle = listOfNotNull(
-                                "Nhấn để phát video",
-                                message.attachmentSize?.takeIf { it.isNotBlank() }
-                            ).joinToString(" · "),
-                            isMe = isMe,
-                            onClick = {
-                                runCatching { uriHandler.openUri(resolvedAttachmentUrl) }
-                            }
-                        )
-                    }
-
-                    if (attachmentType == "FILE" && !resolvedAttachmentUrl.isNullOrBlank()) {
-                        AttachmentActionRow(
-                            icon = Icons.Outlined.Description,
-                            title = message.attachmentName?.takeIf { it.isNotBlank() }
-                                ?: "Tệp đính kèm",
-                            subtitle = message.attachmentSize?.takeIf { it.isNotBlank() }
-                                ?: "Nhấn để mở hoặc tải tệp",
-                            isMe = isMe,
-                            onClick = {
-                                runCatching { uriHandler.openUri(resolvedAttachmentUrl) }
-                            }
-                        )
-                    }
-
-                    if (hasCustomBodyText) {
-                        MarkdownLinkText(
-                            text = message.content,
-                            style = MaterialTheme.typography.bodyMedium,
-                            textColor = bubbleTextColor,
-                            linkColor = bubbleLinkColor
-                        )
-                    }
-
-                    if (detectedLink != null && attachmentType != "IMAGE" && attachmentType != "VIDEO" && attachmentType != "FILE") {
-                        val (url, label, host) = detectedLink
-                        AttachmentActionRow(
-                            icon = Icons.Outlined.Link,
-                            title = label,
-                            subtitle = host,
-                            isMe = isMe,
-                            onClick = { runCatching { uriHandler.openUri(url) } }
-                        )
+                },
+                onLongClick = {
+                    if (isSelectionMode) {
+                        onToggleSelect()
+                    } else {
+                        onLongPressMessage()
                     }
                 }
+            )
+            .padding(
+                horizontal = if (isSelectionMode) 6.dp else 0.dp,
+                vertical = if (isSelectionMode) 4.dp else 0.dp
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (isSelectionMode) {
+            Icon(
+                imageVector = if (isSelected) {
+                    Icons.Filled.CheckCircle
+                } else {
+                    Icons.Outlined.RadioButtonUnchecked
+                },
+                contentDescription = if (isSelected) "Đã chọn" else "Chưa chọn",
+                tint = if (isSelected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+        }
+
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            if (!isMe) {
+                AvatarView(
+                    displayName = senderLabel,
+                    avatarUrl = resolveAssetUrl(message.sender.avatarUrl),
+                    size = 32.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
             }
 
-            val timeText = formatMessageTime(message.createdAt)
-            if (timeText.isNotEmpty()) {
+            Column(
+                horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+                modifier = Modifier.widthIn(max = if (isSelectionMode) 268.dp else 300.dp)
+            ) {
+                // Sender name header shown cleanly for both group and private conversations
                 Text(
-                    text = timeText,
+                    text = senderLabel,
                     style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                 )
+
+                Surface(
+                    color = bubbleContainerColor,
+                    contentColor = bubbleTextColor,
+                    shape = RoundedCornerShape(
+                        topStart = 18.dp,
+                        topEnd = 18.dp,
+                        bottomStart = if (isMe) 18.dp else 4.dp,
+                        bottomEnd = if (isMe) 4.dp else 18.dp
+                    ),
+                    modifier = Modifier.combinedClickable(
+                        onClick = {
+                            if (isSelectionMode) {
+                                onToggleSelect()
+                            }
+                        },
+                        onLongClick = {
+                            if (isSelectionMode) {
+                                onToggleSelect()
+                            } else {
+                                onLongPressMessage()
+                            }
+                        }
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (attachmentType == "IMAGE" && !resolvedAttachmentUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = resolvedAttachmentUrl,
+                                contentDescription = message.attachmentName ?: "Hình ảnh",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 120.dp, max = 240.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .combinedClickable(
+                                        onClick = {
+                                            if (isSelectionMode) {
+                                                onToggleSelect()
+                                            } else {
+                                                onPreviewImage(resolvedAttachmentUrl)
+                                            }
+                                        },
+                                        onLongClick = {
+                                            if (isSelectionMode) {
+                                                onToggleSelect()
+                                            } else {
+                                                onLongPressMessage()
+                                            }
+                                        }
+                                    )
+                            )
+                        }
+
+                        if (attachmentType == "VIDEO" && !resolvedAttachmentUrl.isNullOrBlank()) {
+                            AttachmentActionRow(
+                                icon = Icons.Outlined.PlayCircleOutline,
+                                title = message.attachmentName?.takeIf { it.isNotBlank() }
+                                    ?: "Video đính kèm",
+                                subtitle = listOfNotNull(
+                                    "Nhấn để phát video",
+                                    message.attachmentSize?.takeIf { it.isNotBlank() }
+                                ).joinToString(" · "),
+                                isMe = isMe,
+                                onClick = {
+                                    if (isSelectionMode) {
+                                        onToggleSelect()
+                                    } else {
+                                        runCatching { uriHandler.openUri(resolvedAttachmentUrl) }
+                                    }
+                                },
+                                onLongClick = {
+                                    if (isSelectionMode) {
+                                        onToggleSelect()
+                                    } else {
+                                        onLongPressMessage()
+                                    }
+                                }
+                            )
+                        }
+
+                        if (attachmentType == "FILE" && !resolvedAttachmentUrl.isNullOrBlank()) {
+                            AttachmentActionRow(
+                                icon = Icons.Outlined.Description,
+                                title = message.attachmentName?.takeIf { it.isNotBlank() }
+                                    ?: "Tệp đính kèm",
+                                subtitle = message.attachmentSize?.takeIf { it.isNotBlank() }
+                                    ?: "Nhấn để mở hoặc tải tệp",
+                                isMe = isMe,
+                                onClick = {
+                                    if (isSelectionMode) {
+                                        onToggleSelect()
+                                    } else {
+                                        runCatching { uriHandler.openUri(resolvedAttachmentUrl) }
+                                    }
+                                },
+                                onLongClick = {
+                                    if (isSelectionMode) {
+                                        onToggleSelect()
+                                    } else {
+                                        onLongPressMessage()
+                                    }
+                                }
+                            )
+                        }
+
+                        if (hasCustomBodyText) {
+                            if (isSelectionMode) {
+                                Text(
+                                    text = message.content,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = bubbleTextColor
+                                )
+                            } else {
+                                MarkdownLinkText(
+                                    text = message.content,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    textColor = bubbleTextColor,
+                                    linkColor = bubbleLinkColor
+                                )
+                            }
+                        }
+
+                        if (detectedLink != null && attachmentType != "IMAGE" && attachmentType != "VIDEO" && attachmentType != "FILE") {
+                            val (url, label, host) = detectedLink
+                            AttachmentActionRow(
+                                icon = Icons.Outlined.Link,
+                                title = label,
+                                subtitle = host,
+                                isMe = isMe,
+                                onClick = {
+                                    if (isSelectionMode) {
+                                        onToggleSelect()
+                                    } else {
+                                        runCatching { uriHandler.openUri(url) }
+                                    }
+                                },
+                                onLongClick = {
+                                    if (isSelectionMode) {
+                                        onToggleSelect()
+                                    } else {
+                                        onLongPressMessage()
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                val timeText = formatMessageTime(message.createdAt)
+                if (timeText.isNotEmpty()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = timeText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (!isSelectionMode) {
+                            Icon(
+                                imageVector = Icons.Outlined.DeleteOutline,
+                                contentDescription = "Xóa tin nhắn",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clip(CircleShape)
+                                    .clickable { onLongPressMessage() }
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AttachmentActionRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String,
     isMe: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     val containerBg = if (isMe) {
         MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.14f)
@@ -829,7 +1237,7 @@ private fun AttachmentActionRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(containerBg)
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -16,6 +16,8 @@ import nhom3.chatbln.android.data.model.ConversationItemResponse
 import nhom3.chatbln.android.data.model.ConversationResponse
 import nhom3.chatbln.android.data.model.CreateGroupConversationRequest
 import nhom3.chatbln.android.data.model.CreatePrivateConversationRequest
+import nhom3.chatbln.android.data.model.DeleteMessagesRequest
+import nhom3.chatbln.android.data.model.DeleteMessagesResponse
 import nhom3.chatbln.android.data.model.FriendRequestDto
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.data.model.FriendshipResponse
@@ -160,6 +162,17 @@ class ChatRepository(
         request: SendMessageRequest
     ): Result<MessageDto> = safeApiCall {
         apiService.sendMessage(conversationId = conversationId, request = request)
+    }
+
+    suspend fun deleteMessages(
+        conversationId: Long,
+        messageIds: List<Long>,
+        mode: String
+    ): Result<DeleteMessagesResponse> = safeApiCall {
+        apiService.deleteMessages(
+            conversationId = conversationId,
+            request = DeleteMessagesRequest(messageIds = messageIds, mode = mode)
+        )
     }
 
     suspend fun getFriends(): Result<List<FriendResponse>> = safeApiCall {

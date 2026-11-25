@@ -19,6 +19,7 @@ import nhom3.chatbln.android.data.local.SessionPreferences
 import nhom3.chatbln.android.data.local.UserPresenceMode
 import nhom3.chatbln.android.data.model.CachedUser
 import nhom3.chatbln.android.data.model.ConversationItemResponse
+import nhom3.chatbln.android.data.model.DeleteMessagesResponse
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.data.model.FriendshipResponse
 import nhom3.chatbln.android.data.model.MessageDto
@@ -57,6 +58,7 @@ data class MainChatUiState(
     val isMessagesLoading: Boolean = false,
     val isLoadingOlderMessages: Boolean = false,
     val isSendingMessage: Boolean = false,
+    val isDeletingMessages: Boolean = false,
     val isUploadingAttachment: Boolean = false,
     val inChatSearchQuery: String = "",
     val friends: List<FriendResponse> = emptyList(),
@@ -156,6 +158,12 @@ class MainChatViewModel(
         viewModelScope.launch {
             stompClient.presenceEvents.collectLatest { event ->
                 handlePresenceEvent(event)
+            }
+        }
+
+        viewModelScope.launch {
+            stompClient.deletionEvents.collectLatest { event ->
+                applyMessageDeletion(event)
             }
         }
     }
@@ -920,6 +928,95 @@ class MainChatViewModel(
                         it.copy(snackbarMessage = err.message ?: "Không thể xóa cuộc trò chuyện.")
                     }
                 }
+            )
+        }
+    }
+
+    fun deleteMessages(
+        conversationId: Long,
+        messageIds: List<Long>,
+        mode: String,
+        onSuccess: () -> Unit = {}
+    ) {
+        val uniqueIds = messageIds.distinct().filter { it > 0L }
+        if (uniqueIds.isEmpty() || _uiState.value.isDeletingMessages) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDeletingMessages = true) }
+            repository.deleteMessages(
+                conversationId = conversationId,
+                messageIds = uniqueIds,
+                mode = mode
+            ).fold(
+                onSuccess = { response ->
+                    applyMessageDeletion(response)
+                    val deletedCount = response.deletedIds.size.coerceAtLeast(uniqueIds.size)
+                    val notice = if (mode.equals("FOR_EVERYONE", ignoreCase = true)) {
+                        "Đã thu hồi $deletedCount tin nhắn."
+                    } else {
+                        "Đã xóa $deletedCount tin nhắn ở phía bạn."
+                    }
+                    _uiState.update {
+                        it.copy(
+                            isDeletingMessages = false,
+                            snackbarMessage = notice
+                        )
+                    }
+                    onSuccess()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isDeletingMessages = false,
+                            snackbarMessage = err.message ?: "Không thể xóa tin nhắn."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    private fun applyMessageDeletion(event: DeleteMessagesResponse) {
+        val deletedSet = event.deletedIds.toHashSet()
+        if (deletedSet.isEmpty()) return
+
+        _uiState.update { state ->
+            val currentMessages = state.messagesByConversation[event.conversationId]
+            val updatedMessagesMap = if (currentMessages != null) {
+                val filtered = currentMessages.filterNot { it.id in deletedSet }
+                state.messagesByConversation.toMutableMap().apply {
+                    put(event.conversationId, filtered)
+                }
+            } else {
+                state.messagesByConversation
+            }
+
+            val updatedOldestMap = if (currentMessages != null) {
+                val filtered = updatedMessagesMap[event.conversationId].orEmpty()
+                state.oldestMessageIdByConversation.toMutableMap().apply {
+                    put(event.conversationId, filtered.firstOrNull()?.id)
+                }
+            } else {
+                state.oldestMessageIdByConversation
+            }
+
+            val updatedConversations = state.conversations.map { conv ->
+                if (conv.id == event.conversationId) {
+                    conv.copy(
+                        lastMessage = event.lastMessage,
+                        lastMessageSenderName = event.lastMessageSenderName,
+                        lastMessageSenderUsername = event.lastMessageSenderUsername,
+                        lastMessageTime = event.lastMessageTime
+                    )
+                } else {
+                    conv
+                }
+            }
+
+            state.copy(
+                messagesByConversation = updatedMessagesMap,
+                oldestMessageIdByConversation = updatedOldestMap,
+                conversations = updatedConversations
             )
         }
     }

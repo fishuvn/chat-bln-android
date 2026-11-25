@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import nhom3.chatbln.android.data.local.SessionPreferences
+import nhom3.chatbln.android.data.model.DeleteMessagesResponse
 import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.data.model.PresenceEvent
 import okhttp3.OkHttpClient
@@ -45,6 +46,9 @@ class StompRealtimeClient(
     private val _presenceEvents = MutableSharedFlow<PresenceEvent>(extraBufferCapacity = 64)
     val presenceEvents: SharedFlow<PresenceEvent> = _presenceEvents.asSharedFlow()
 
+    private val _deletionEvents = MutableSharedFlow<DeleteMessagesResponse>(extraBufferCapacity = 64)
+    val deletionEvents: SharedFlow<DeleteMessagesResponse> = _deletionEvents.asSharedFlow()
+
     private val desiredTopics = ConcurrentHashMap<String, String>()
     private val activeTopics = ConcurrentHashMap.newKeySet<String>()
     private val subCounter = AtomicInteger(1)
@@ -72,6 +76,7 @@ class StompRealtimeClient(
 
         ensureTopicRegistered(TOPIC_PRESENCE)
         ensureTopicRegistered("/topic/users/$cleanUser")
+        ensureTopicRegistered("/topic/users/$cleanUser/deletions")
 
         if (_isConnected.value || !isConnecting.compareAndSet(false, true)) {
             return
@@ -237,6 +242,12 @@ class StompRealtimeClient(
                         runCatching { gson.fromJson(payload, PresenceEvent::class.java) }
                             .getOrNull()
                             ?.let { _presenceEvents.tryEmit(it) }
+                    }
+
+                    destination.endsWith("/deletions") -> {
+                        runCatching { gson.fromJson(payload, DeleteMessagesResponse::class.java) }
+                            .getOrNull()
+                            ?.let { _deletionEvents.tryEmit(it) }
                     }
 
                     destination.startsWith("/topic/users/") ||
