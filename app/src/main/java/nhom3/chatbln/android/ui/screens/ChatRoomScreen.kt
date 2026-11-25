@@ -238,6 +238,12 @@ fun ChatRoomScreen(
                 showInfoSheet = false
                 previewImageUrl = url
             },
+            onDeleteConversation = {
+                showInfoSheet = false
+                viewModel.deleteConversation(conversationId = conversationId) {
+                    onNavigateBack()
+                }
+            },
             onDismiss = { showInfoSheet = false }
         )
     }

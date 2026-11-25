@@ -20,6 +20,7 @@ import nhom3.chatbln.android.data.model.UserProfileResponse
 import nhom3.chatbln.android.data.model.UserSearchResponse
 import okhttp3.MultipartBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
@@ -60,6 +61,11 @@ interface ChatBlnApiService {
     suspend fun createGroupConversation(
         @Body request: CreateGroupConversationRequest
     ): ConversationResponse
+
+    @DELETE("conversations/{id}")
+    suspend fun deleteConversation(
+        @Path("id") conversationId: Long
+    ): Map<String, Any>
 
     @GET("conversations/{id}/messages")
     suspend fun getMessages(

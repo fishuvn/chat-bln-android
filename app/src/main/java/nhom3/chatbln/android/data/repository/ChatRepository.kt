@@ -138,6 +138,11 @@ class ChatRepository(
         )
     }
 
+    suspend fun deleteConversation(conversationId: Long): Result<Unit> = safeApiCall {
+        apiService.deleteConversation(conversationId)
+        Unit
+    }
+
     suspend fun getMessages(
         conversationId: Long,
         before: Long? = null,

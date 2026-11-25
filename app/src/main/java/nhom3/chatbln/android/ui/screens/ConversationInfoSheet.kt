@@ -25,19 +25,25 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.PlayCircleOutline
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -63,11 +69,37 @@ fun ConversationInfoSheet(
     messages: List<MessageDto>,
     resolveAssetUrl: (String?) -> String?,
     onPreviewImage: (String) -> Unit,
+    onDeleteConversation: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val uriHandler = LocalUriHandler.current
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
+    val title = conversation.name?.takeIf { it.isNotBlank() } ?: "Hội thoại #${conversation.id}"
+
+    if (showDeleteConfirm && onDeleteConversation != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Xóa lịch sử trò chuyện") },
+            text = { Text("Xóa cuộc trò chuyện và toàn bộ tin nhắn với \"$title\"?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDeleteConversation()
+                    }
+                ) {
+                    Text("Xóa", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
 
     val sharedImages = remember(messages) {
         messages.asReversed().mapNotNull { msg ->
@@ -79,14 +111,12 @@ fun ConversationInfoSheet(
         }
     }
 
-    val sharedFilesAndVideos = remember(messages) {
+        val sharedFilesAndVideos = remember(messages) {
         messages.asReversed().filter { msg ->
             val type = msg.attachmentType?.uppercase().orEmpty()
             (type == "FILE" || type == "VIDEO") && !msg.attachmentUrl.isNullOrBlank()
         }
     }
-
-    val title = conversation.name?.takeIf { it.isNotBlank() } ?: "Hội thoại #${conversation.id}"
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -190,6 +220,25 @@ fun ConversationInfoSheet(
                                 label = "Tiểu sử",
                                 value = conversation.bio?.takeIf { it.isNotBlank() } ?: "Chưa có tiểu sử."
                             )
+                        }
+
+                        if (onDeleteConversation != null) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedButton(
+                                onClick = { showDeleteConfirm = true },
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.DeleteOutline,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Xóa lịch sử trò chuyện")
+                            }
                         }
                     }
                 }

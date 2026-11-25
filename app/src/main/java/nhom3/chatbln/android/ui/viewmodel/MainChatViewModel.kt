@@ -896,6 +896,34 @@ class MainChatViewModel(
         return repository.resolveAssetUrl(rawUrl, _uiState.value.serverBaseUrl)
     }
 
+    fun deleteConversation(conversationId: Long, onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            repository.deleteConversation(conversationId).fold(
+                onSuccess = {
+                    val remaining = _uiState.value.conversations.filterNot { it.id == conversationId }
+                    stompClient.syncConversationSubscriptions(remaining.map { it.id })
+                    _uiState.update { state ->
+                        state.copy(
+                            conversations = remaining,
+                            messagesByConversation = state.messagesByConversation - conversationId,
+                            hasMoreByConversation = state.hasMoreByConversation - conversationId,
+                            oldestMessageIdByConversation = state.oldestMessageIdByConversation - conversationId,
+                            unreadCounts = state.unreadCounts - conversationId,
+                            activeConversationId = if (state.activeConversationId == conversationId) null else state.activeConversationId,
+                            snackbarMessage = "Đã xóa cuộc trò chuyện."
+                        )
+                    }
+                    onDeleted()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(snackbarMessage = err.message ?: "Không thể xóa cuộc trò chuyện.")
+                    }
+                }
+            )
+        }
+    }
+
     fun consumeSnackbar() {
         _uiState.update { it.copy(snackbarMessage = null) }
     }
