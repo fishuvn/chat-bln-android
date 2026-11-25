@@ -8,6 +8,8 @@ plugins {
 
 val keystorePath: String? = System.getenv("ANDROID_KEYSTORE_PATH")
 val hasCustomKeystore: Boolean = !keystorePath.isNullOrBlank() && file(keystorePath).exists()
+val ciVersionName: String? = System.getenv("APP_VERSION_NAME")?.takeIf { it.isNotBlank() }
+val ciVersionCode: Int? = System.getenv("APP_VERSION_CODE")?.toIntOrNull()
 
 android {
     namespace = "nhom3.chatbln.android"
@@ -17,8 +19,8 @@ android {
         applicationId = "nhom3.chatbln.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = ciVersionCode ?: 10000
+        versionName = ciVersionName ?: "1.0.0"
 
         vectorDrawables {
             useSupportLibrary = true
