@@ -2,6 +2,29 @@
 
 Quy ước phiên bản: `1.0.x` / `1.x.x` cho các bản cập nhật và sửa lỗi nhỏ (mỗi bậc tối đa `10`, ví dụ `1.0.10` → `1.1.0`); `x.0.0` dành cho thay đổi lớn về kiến trúc, ngôn ngữ lập trình, nâng phiên bản HĐH tối thiểu hoặc đại tu UI/UX.
 
+## v1.0.1 — Chat BLN Android (2026-11-26 00:43 UTC+7)
+
+- **Phiên bản**: `v1.0.1` (Build `10001`)
+- **Phân loại**: Bản cập nhật & sửa lỗi nhỏ (`1.x.x`, giới hạn tối đa `.10`)
+
+### ✨ Tính năng mới
+- feat(android): sync ONLINE/IDLE/SLEEP/DND/OFFLINE presence modes with backend and render live status badges (`fef3280`)
+- feat(android): add group members list and unfriend/re-friend support (`e30a983`)
+- feat(android): add single and multi-select message deletion with realtime sync (`0bd4089`)
+- feat(android): add persistent conversation deletion via DELETE /api/conversations/:id (`0128919`)
+- feat(android): add interactive user presence status selector (`ff5fe27`)
+
+### 🐛 Sửa lỗi
+- fix(android): show sent friend request recipient details and support withdrawing pending requests (`e4b2888`)
+- fix(android): sync rejected friend requests and display daily limit feedback (`06a8a21`)
+- fix(android): use lambda receiver in sendFriendRequestById error update (`4e34d49`)
+- fix(android): default to https://chat-bln.fishu.io.vn and smart HTTPS scheme (`0bb95e2`)
+- fix(android): make FriendResponse.isOnline non-null Boolean (`7f3828e`)
+
+### 🔧 Cải tiến & Bảo trì
+- ci(release): auto-bump version (max .10 per slot), generate changelog, and publish Android APKs Release on build (`c1fb819`)
+- ci(android): accept SDK licenses directly via preinstalled sdkmanager (`cfc820e`)
+
 ## v1.0.0 — Chat BLN Android (Bản nền tảng ban đầu)
 
 - **Phiên bản**: `v1.0.0` (Build `10000`)
