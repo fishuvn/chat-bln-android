@@ -145,13 +145,22 @@ fun MainScaffoldScreen(
                                 onReady = onOpenConversation
                             )
                         },
-                        onCreateGroupChat = { groupName, memberIds ->
+                        onCreateGroupChat = { groupName, memberIds, groupVisibility ->
                             viewModel.createGroupChat(
                                 name = groupName,
                                 memberIds = memberIds,
+                                groupVisibility = groupVisibility,
                                 onReady = onOpenConversation
                             )
-                        }
+                        },
+                        onPreviewGroupInvite = viewModel::previewGroupInvite,
+                        onJoinGroupByInvite = { codeOrLink ->
+                            viewModel.joinGroupByInvite(
+                                rawInput = codeOrLink,
+                                onJoinedOpenChat = onOpenConversation
+                            )
+                        },
+                        onClearInviteDialog = viewModel::clearGroupInviteDialogState
                     )
                 }
 

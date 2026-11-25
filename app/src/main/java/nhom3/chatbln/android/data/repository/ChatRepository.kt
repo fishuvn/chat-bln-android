@@ -21,18 +21,26 @@ import nhom3.chatbln.android.data.model.DeleteMessagesResponse
 import nhom3.chatbln.android.data.model.FriendRequestDto
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.data.model.FriendshipResponse
+import nhom3.chatbln.android.data.model.GroupInvitePreviewResponse
+import nhom3.chatbln.android.data.model.GroupJoinRequestDto
 import nhom3.chatbln.android.data.model.GroupMemberDto
+import nhom3.chatbln.android.data.model.JoinGroupResponse
 import nhom3.chatbln.android.data.model.LoginRequest
 import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.data.model.MessageHistoryResponse
+import nhom3.chatbln.android.data.model.RegenerateInviteCodeResponse
 import nhom3.chatbln.android.data.model.RegisterRequest
 import nhom3.chatbln.android.data.model.SendMessageRequest
+import nhom3.chatbln.android.data.model.TransferGroupLeaderRequest
+import nhom3.chatbln.android.data.model.UpdateGroupVisibilityRequest
+import nhom3.chatbln.android.data.model.UpdateMemberRoleRequest
 import nhom3.chatbln.android.data.model.UpdatePresenceRequest
 import nhom3.chatbln.android.data.model.UpdateProfileRequest
 import nhom3.chatbln.android.data.model.UploadResponse
 import nhom3.chatbln.android.data.model.UserProfileResponse
 import nhom3.chatbln.android.data.model.UserSearchResponse
 import nhom3.chatbln.android.data.remote.ChatBlnApiService
+import nhom3.chatbln.android.ui.util.parseInviteCodeInput
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -142,10 +150,20 @@ class ChatRepository(
 
     suspend fun createGroupConversation(
         name: String,
-        memberIds: List<Long>
+        memberIds: List<Long>,
+        groupVisibility: String = "PUBLIC"
     ): Result<ConversationResponse> = safeApiCall {
+        val normalizedVisibility = if (groupVisibility.equals("PRIVATE", ignoreCase = true)) {
+            "PRIVATE"
+        } else {
+            "PUBLIC"
+        }
         apiService.createGroupConversation(
-            CreateGroupConversationRequest(name = name.trim(), memberIds = memberIds)
+            CreateGroupConversationRequest(
+                name = name.trim(),
+                memberIds = memberIds,
+                groupVisibility = normalizedVisibility
+            )
         )
     }
 
@@ -158,6 +176,82 @@ class ChatRepository(
         safeApiCall {
             apiService.getConversationMembers(conversationId)
         }
+
+    suspend fun updateGroupVisibility(
+        conversationId: Long,
+        groupVisibility: String
+    ): Result<ConversationResponse> = safeApiCall {
+        val normalized = if (groupVisibility.equals("PRIVATE", ignoreCase = true)) {
+            "PRIVATE"
+        } else {
+            "PUBLIC"
+        }
+        apiService.updateGroupVisibility(
+            conversationId = conversationId,
+            request = UpdateGroupVisibilityRequest(groupVisibility = normalized)
+        )
+    }
+
+    suspend fun regenerateInviteCode(
+        conversationId: Long
+    ): Result<RegenerateInviteCodeResponse> = safeApiCall {
+        apiService.regenerateInviteCode(conversationId = conversationId)
+    }
+
+    suspend fun updateGroupMemberRole(
+        conversationId: Long,
+        targetUserId: Long,
+        role: String
+    ): Result<List<GroupMemberDto>> = safeApiCall {
+        apiService.updateGroupMemberRole(
+            conversationId = conversationId,
+            targetUserId = targetUserId,
+            request = UpdateMemberRoleRequest(role = role.trim().uppercase(Locale.ROOT))
+        )
+    }
+
+    suspend fun transferGroupLeadership(
+        conversationId: Long,
+        newLeaderUserId: Long
+    ): Result<List<GroupMemberDto>> = safeApiCall {
+        apiService.transferGroupLeadership(
+            conversationId = conversationId,
+            request = TransferGroupLeaderRequest(newLeaderUserId = newLeaderUserId)
+        )
+    }
+
+    suspend fun getGroupInvitePreview(rawInput: String): Result<GroupInvitePreviewResponse> =
+        safeApiCall {
+            val code = parseInviteCodeInput(rawInput)
+                ?: throw IllegalArgumentException("Vui lòng nhập mã mời hoặc liên kết nhóm hợp lệ.")
+            apiService.getGroupInvitePreview(code)
+        }
+
+    suspend fun joinGroupByInviteCode(rawInput: String): Result<JoinGroupResponse> =
+        safeApiCall {
+            val code = parseInviteCodeInput(rawInput)
+                ?: throw IllegalArgumentException("Vui lòng nhập mã mời hoặc liên kết nhóm hợp lệ.")
+            apiService.joinGroupByInviteCode(code)
+        }
+
+    suspend fun getGroupJoinRequests(conversationId: Long): Result<List<GroupJoinRequestDto>> =
+        safeApiCall {
+            apiService.getGroupJoinRequests(conversationId)
+        }
+
+    suspend fun approveGroupJoinRequest(
+        conversationId: Long,
+        requestId: Long
+    ): Result<GroupJoinRequestDto> = safeApiCall {
+        apiService.approveGroupJoinRequest(conversationId = conversationId, requestId = requestId)
+    }
+
+    suspend fun rejectGroupJoinRequest(
+        conversationId: Long,
+        requestId: Long
+    ): Result<GroupJoinRequestDto> = safeApiCall {
+        apiService.rejectGroupJoinRequest(conversationId = conversationId, requestId = requestId)
+    }
 
     suspend fun getMessages(
         conversationId: Long,

@@ -21,7 +21,10 @@ import nhom3.chatbln.android.data.model.CachedUser
 import nhom3.chatbln.android.data.model.ConversationItemResponse
 import nhom3.chatbln.android.data.model.DeleteMessagesResponse
 import nhom3.chatbln.android.data.model.FriendResponse
+import nhom3.chatbln.android.data.model.FriendshipEventDto
 import nhom3.chatbln.android.data.model.FriendshipResponse
+import nhom3.chatbln.android.data.model.GroupInvitePreviewResponse
+import nhom3.chatbln.android.data.model.GroupJoinRequestDto
 import nhom3.chatbln.android.data.model.GroupMemberDto
 import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.data.model.PresenceEvent
@@ -55,6 +58,16 @@ data class MainChatUiState(
     val activeConversationId: Long? = null,
     val messagesByConversation: Map<Long, List<MessageDto>> = emptyMap(),
     val groupMembersByConversation: Map<Long, List<GroupMemberDto>> = emptyMap(),
+    val groupJoinRequestsByConversation: Map<Long, List<GroupJoinRequestDto>> = emptyMap(),
+    val isUpdatingGroupSettings: Boolean = false,
+    val processingGroupMemberIds: Set<Long> = emptySet(),
+    val processingJoinRequestIds: Set<Long> = emptySet(),
+    val invitePreview: GroupInvitePreviewResponse? = null,
+    val isLoadingInvitePreview: Boolean = false,
+    val invitePreviewError: String? = null,
+    val isJoiningGroupByInvite: Boolean = false,
+    val joinGroupFeedback: String? = null,
+    val joinGroupFeedbackIsError: Boolean = false,
     val hasMoreByConversation: Map<Long, Boolean> = emptyMap(),
     val oldestMessageIdByConversation: Map<Long, Long?> = emptyMap(),
     val isMessagesLoading: Boolean = false,
@@ -170,12 +183,87 @@ class MainChatViewModel(
         }
 
         viewModelScope.launch {
-            stompClient.friendshipEvents.collectLatest {
-                refreshFriendsAndRequests()
-                refreshConversations()
-                if (_uiState.value.hasSearchedUsers && _uiState.value.userSearchKeyword.isNotBlank()) {
-                    executeUserSearch()
+            stompClient.friendshipEvents.collectLatest { event ->
+                handleFriendshipOrGroupEvent(event)
+            }
+        }
+    }
+
+    private fun handleFriendshipOrGroupEvent(event: FriendshipEventDto) {
+        val type = event.type?.uppercase().orEmpty()
+        val myId = _uiState.value.currentUser?.id
+
+        if (type == "CONVERSATION_DELETED" && event.targetUserId != null) {
+            val deletedConvId = event.targetUserId
+            val wasActive = _uiState.value.activeConversationId == deletedConvId
+            val remaining = _uiState.value.conversations.filterNot { it.id == deletedConvId }
+            stompClient.syncConversationSubscriptions(remaining.map { it.id })
+            _uiState.update { state ->
+                state.copy(
+                    conversations = remaining,
+                    messagesByConversation = state.messagesByConversation - deletedConvId,
+                    groupMembersByConversation = state.groupMembersByConversation - deletedConvId,
+                    groupJoinRequestsByConversation = state.groupJoinRequestsByConversation - deletedConvId,
+                    hasMoreByConversation = state.hasMoreByConversation - deletedConvId,
+                    oldestMessageIdByConversation = state.oldestMessageIdByConversation - deletedConvId,
+                    unreadCounts = state.unreadCounts - deletedConvId,
+                    snackbarMessage = if (wasActive && event.actorUserId != myId) {
+                        "Nhóm hoặc cuộc trò chuyện đã được giải tán."
+                    } else {
+                        state.snackbarMessage
+                    }
+                )
+            }
+            refreshConversations()
+            return
+        }
+
+        val isGroupEvent = type.startsWith("GROUP_") || type.startsWith("CONVERSATION_")
+        if (!isGroupEvent) {
+            refreshFriendsAndRequests()
+            if (_uiState.value.hasSearchedUsers && _uiState.value.userSearchKeyword.isNotBlank()) {
+                executeUserSearch()
+            }
+        }
+
+        if (event.actorUserId != null && event.actorUserId != myId) {
+            when (type) {
+                "GROUP_JOIN_REQUESTED" -> {
+                    _uiState.update {
+                        it.copy(snackbarMessage = "Có yêu cầu tham gia nhóm mới đang chờ phê duyệt.")
+                    }
                 }
+                "GROUP_JOIN_APPROVED" -> {
+                    val targetConvId = event.targetUserId
+                    val alreadyHadConv = targetConvId != null &&
+                        _uiState.value.conversations.any { it.id == targetConvId }
+                    if (!alreadyHadConv) {
+                        _uiState.update {
+                            it.copy(snackbarMessage = "Yêu cầu tham gia nhóm của bạn đã được phê duyệt.")
+                        }
+                    }
+                }
+                "GROUP_JOIN_REJECTED" -> {
+                    val targetConvId = event.targetUserId
+                    val alreadyHadConv = targetConvId != null &&
+                        _uiState.value.conversations.any { it.id == targetConvId }
+                    if (!alreadyHadConv) {
+                        _uiState.update {
+                            it.copy(snackbarMessage = "Yêu cầu tham gia nhóm của bạn đã bị từ chối.")
+                        }
+                    }
+                }
+            }
+        }
+
+        refreshConversations()
+
+        val activeId = _uiState.value.activeConversationId
+        val affectedConvId = event.targetUserId
+        if (activeId != null && (affectedConvId == null || affectedConvId == activeId)) {
+            val activeConv = _uiState.value.conversations.firstOrNull { it.id == activeId }
+            if (activeConv?.isGroup == true || isGroupEvent) {
+                loadConversationMembers(activeId)
             }
         }
     }
@@ -216,19 +304,34 @@ class MainChatViewModel(
             repository.getConversations().fold(
                 onSuccess = { list ->
                     stompClient.syncConversationSubscriptions(list.map { c -> c.id })
+                    var activeGroupToSyncRequests: ConversationItemResponse? = null
                     _uiState.update { state ->
                         val updatedMembers = state.groupMembersByConversation.toMutableMap()
+                        val updatedRequests = state.groupJoinRequestsByConversation.toMutableMap()
                         list.forEach { item ->
                             if (item.isGroup && !item.members.isNullOrEmpty()) {
                                 updatedMembers[item.id] = item.members
+                            }
+                            if (item.isGroup && !item.canManageGroupInvitesAndRequests) {
+                                updatedRequests.remove(item.id)
+                            }
+                            if (item.id == state.activeConversationId && item.isGroup) {
+                                activeGroupToSyncRequests = item
                             }
                         }
                         state.copy(
                             conversations = list,
                             groupMembersByConversation = updatedMembers,
+                            groupJoinRequestsByConversation = updatedRequests,
                             isConversationsLoading = false,
                             conversationsError = null
                         )
+                    }
+                    activeGroupToSyncRequests?.let { activeGroup ->
+                        loadConversationMembers(activeGroup.id)
+                        if (activeGroup.canManageGroupInvitesAndRequests) {
+                            loadGroupJoinRequests(activeGroup.id)
+                        }
                     }
                 },
                 onFailure = { err ->
@@ -307,8 +410,12 @@ class MainChatViewModel(
             )
         }
 
-        if (_uiState.value.conversations.firstOrNull { it.id == conversationId }?.isGroup == true) {
+        val targetConv = _uiState.value.conversations.firstOrNull { it.id == conversationId }
+        if (targetConv?.isGroup == true) {
             loadConversationMembers(conversationId)
+            if (targetConv.canManageGroupInvitesAndRequests) {
+                loadGroupJoinRequests(conversationId)
+            }
         }
 
         viewModelScope.launch {
@@ -316,6 +423,7 @@ class MainChatViewModel(
             _uiState.update { it.copy(isMessagesLoading = !hasLoadedBefore) }
             repository.getMessages(conversationId = conversationId, before = null, limit = 30).fold(
                 onSuccess = { history ->
+                    val isGroupHistory = history.conversationType.equals("GROUP", ignoreCase = true)
                     _uiState.update { state ->
                         val updatedMap = state.messagesByConversation.toMutableMap()
                         updatedMap[conversationId] = history.messages
@@ -332,6 +440,9 @@ class MainChatViewModel(
                             oldestMessageIdByConversation = updatedOldest,
                             isMessagesLoading = false
                         )
+                    }
+                    if (isGroupHistory && targetConv == null) {
+                        loadConversationMembers(conversationId)
                     }
                 },
                 onFailure = { err ->
@@ -560,6 +671,7 @@ class MainChatViewModel(
     fun createGroupChat(
         name: String,
         memberIds: List<Long>,
+        groupVisibility: String = "PUBLIC",
         onReady: (Long) -> Unit
     ) {
         val cleanName = name.trim()
@@ -567,20 +679,29 @@ class MainChatViewModel(
             _uiState.update { it.copy(snackbarMessage = "Vui lòng nhập tên nhóm trò chuyện.") }
             return
         }
-        if (memberIds.isEmpty()) {
-            _uiState.update { it.copy(snackbarMessage = "Vui lòng chọn ít nhất 1 thành viên.") }
-            return
+        val normalizedVisibility = if (groupVisibility.equals("PRIVATE", ignoreCase = true)) {
+            "PRIVATE"
+        } else {
+            "PUBLIC"
         }
 
         viewModelScope.launch {
             _uiState.update { it.copy(isCreatingConversation = true) }
-            repository.createGroupConversation(name = cleanName, memberIds = memberIds).fold(
+            repository.createGroupConversation(
+                name = cleanName,
+                memberIds = memberIds,
+                groupVisibility = normalizedVisibility
+            ).fold(
                 onSuccess = { created ->
                     stompClient.subscribeConversation(created.id)
                     val newItem = ConversationItemResponse(
                         id = created.id,
                         name = created.name ?: cleanName,
                         type = "GROUP",
+                        groupVisibility = created.groupVisibility ?: normalizedVisibility,
+                        inviteCode = created.inviteCode,
+                        currentUserRole = "ADMIN",
+                        memberCount = memberIds.distinct().size + 1,
                         lastMessage = "Nhóm trò chuyện mới",
                         lastMessageTime = created.createdAt ?: LocalDateTime.now().toString()
                     )
@@ -599,6 +720,445 @@ class MainChatViewModel(
                         it.copy(
                             isCreatingConversation = false,
                             snackbarMessage = err.message ?: "Không thể tạo nhóm trò chuyện."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun previewGroupInvite(rawInput: String) {
+        val trimmed = rawInput.trim()
+        if (trimmed.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    invitePreview = null,
+                    invitePreviewError = "Vui lòng nhập liên kết hoặc mã mời nhóm."
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoadingInvitePreview = true,
+                    invitePreviewError = null,
+                    joinGroupFeedback = null,
+                    joinGroupFeedbackIsError = false
+                )
+            }
+            repository.getGroupInvitePreview(trimmed).fold(
+                onSuccess = { preview ->
+                    _uiState.update {
+                        it.copy(
+                            invitePreview = preview,
+                            isLoadingInvitePreview = false,
+                            invitePreviewError = null
+                        )
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            invitePreview = null,
+                            isLoadingInvitePreview = false,
+                            invitePreviewError = err.message ?: "Không tìm thấy nhóm tương ứng với mã mời."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun joinGroupByInvite(
+        rawInput: String,
+        onJoinedOpenChat: (Long) -> Unit
+    ) {
+        val trimmed = rawInput.trim()
+        if (trimmed.isEmpty() || _uiState.value.isJoiningGroupByInvite) return
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isJoiningGroupByInvite = true,
+                    joinGroupFeedback = null,
+                    joinGroupFeedbackIsError = false
+                )
+            }
+            repository.joinGroupByInviteCode(trimmed).fold(
+                onSuccess = { result ->
+                    val statusUpper = result.status.uppercase()
+                    if (statusUpper == "JOINED" || statusUpper == "ALREADY_MEMBER") {
+                        stompClient.subscribeConversation(result.conversationId)
+                        _uiState.update { state ->
+                            val exists = state.conversations.any { it.id == result.conversationId }
+                            val updatedConvs = if (exists) {
+                                state.conversations
+                            } else {
+                                listOf(
+                                    ConversationItemResponse(
+                                        id = result.conversationId,
+                                        name = result.name ?: "Nhóm #${result.conversationId}",
+                                        type = "GROUP",
+                                        groupVisibility = result.groupVisibility ?: "PUBLIC",
+                                        currentUserRole = "MEMBER",
+                                        lastMessage = "Đã tham gia nhóm",
+                                        lastMessageTime = LocalDateTime.now().toString()
+                                    )
+                                ) + state.conversations
+                            }
+                            state.copy(
+                                conversations = updatedConvs,
+                                isJoiningGroupByInvite = false,
+                                snackbarMessage = result.message
+                                    ?: "Đã tham gia nhóm \"${result.name.orEmpty()}\"."
+                            )
+                        }
+                        refreshConversations()
+                        clearGroupInviteDialogState()
+                        onJoinedOpenChat(result.conversationId)
+                    } else {
+                        // PENDING_APPROVAL for private group
+                        val feedback = result.message
+                            ?: "Đã gửi yêu cầu tham gia nhóm riêng tư. Vui lòng chờ Trưởng nhóm hoặc Phó nhóm phê duyệt."
+                        _uiState.update { state ->
+                            state.copy(
+                                isJoiningGroupByInvite = false,
+                                invitePreview = state.invitePreview?.copy(joinStatus = "PENDING"),
+                                joinGroupFeedback = feedback,
+                                joinGroupFeedbackIsError = false,
+                                snackbarMessage = feedback
+                            )
+                        }
+                    }
+                },
+                onFailure = { err ->
+                    val msg = err.message ?: "Không thể tham gia nhóm."
+                    _uiState.update {
+                        it.copy(
+                            isJoiningGroupByInvite = false,
+                            joinGroupFeedback = msg,
+                            joinGroupFeedbackIsError = true
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun clearGroupInviteDialogState() {
+        _uiState.update {
+            it.copy(
+                invitePreview = null,
+                isLoadingInvitePreview = false,
+                invitePreviewError = null,
+                isJoiningGroupByInvite = false,
+                joinGroupFeedback = null,
+                joinGroupFeedbackIsError = false
+            )
+        }
+    }
+
+    fun updateGroupVisibility(conversationId: Long, groupVisibility: String) {
+        if (_uiState.value.isUpdatingGroupSettings) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isUpdatingGroupSettings = true) }
+            repository.updateGroupVisibility(conversationId, groupVisibility).fold(
+                onSuccess = { resp ->
+                    val nextVis = resp.groupVisibility ?: groupVisibility
+                    val label = if (nextVis.equals("PRIVATE", ignoreCase = true)) {
+                        "Nhóm riêng tư"
+                    } else {
+                        "Nhóm công khai"
+                    }
+                    _uiState.update { state ->
+                        val updatedConvs = state.conversations.map { conv ->
+                            if (conv.id == conversationId) {
+                                conv.copy(
+                                    groupVisibility = nextVis,
+                                    inviteCode = resp.inviteCode ?: conv.inviteCode
+                                )
+                            } else {
+                                conv
+                            }
+                        }
+                        state.copy(
+                            conversations = updatedConvs,
+                            isUpdatingGroupSettings = false,
+                            snackbarMessage = "Đã chuyển chế độ sang $label."
+                        )
+                    }
+                    if (nextVis.equals("PRIVATE", ignoreCase = true)) {
+                        loadGroupJoinRequests(conversationId)
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isUpdatingGroupSettings = false,
+                            snackbarMessage = err.message ?: "Không thể đổi chế độ hiển thị nhóm."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun regenerateGroupInviteCode(conversationId: Long) {
+        if (_uiState.value.isUpdatingGroupSettings) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isUpdatingGroupSettings = true) }
+            repository.regenerateInviteCode(conversationId).fold(
+                onSuccess = { resp ->
+                    _uiState.update { state ->
+                        val updatedConvs = state.conversations.map { conv ->
+                            if (conv.id == conversationId) {
+                                conv.copy(
+                                    inviteCode = resp.inviteCode,
+                                    groupVisibility = resp.groupVisibility ?: conv.groupVisibility
+                                )
+                            } else {
+                                conv
+                            }
+                        }
+                        state.copy(
+                            conversations = updatedConvs,
+                            isUpdatingGroupSettings = false,
+                            snackbarMessage = "Đã làm mới liên kết mời tham gia nhóm."
+                        )
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isUpdatingGroupSettings = false,
+                            snackbarMessage = err.message ?: "Không thể làm mới liên kết mời."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun updateGroupMemberRole(
+        conversationId: Long,
+        targetMember: GroupMemberDto,
+        nextRole: String
+    ) {
+        if (_uiState.value.processingGroupMemberIds.contains(targetMember.id)) return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(processingGroupMemberIds = it.processingGroupMemberIds + targetMember.id)
+            }
+            repository.updateGroupMemberRole(
+                conversationId = conversationId,
+                targetUserId = targetMember.id,
+                role = nextRole
+            ).fold(
+                onSuccess = { members ->
+                    val notice = if (nextRole.equals("DEPUTY", ignoreCase = true)) {
+                        "Đã bổ nhiệm ${targetMember.displayName} làm Phó nhóm."
+                    } else {
+                        "Đã gỡ quyền Phó nhóm của ${targetMember.displayName}."
+                    }
+                    applyUpdatedGroupMembers(conversationId, members, notice)
+                    _uiState.update {
+                        it.copy(processingGroupMemberIds = it.processingGroupMemberIds - targetMember.id)
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            processingGroupMemberIds = it.processingGroupMemberIds - targetMember.id,
+                            snackbarMessage = err.message ?: "Không thể cập nhật vai trò thành viên."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun transferGroupLeadership(
+        conversationId: Long,
+        newLeader: GroupMemberDto
+    ) {
+        if (_uiState.value.processingGroupMemberIds.contains(newLeader.id)) return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(processingGroupMemberIds = it.processingGroupMemberIds + newLeader.id)
+            }
+            repository.transferGroupLeadership(
+                conversationId = conversationId,
+                newLeaderUserId = newLeader.id
+            ).fold(
+                onSuccess = { members ->
+                    applyUpdatedGroupMembers(
+                        conversationId = conversationId,
+                        members = members,
+                        snackbar = "Đã chuyển quyền Trưởng nhóm cho ${newLeader.displayName}."
+                    )
+                    _uiState.update { state ->
+                        state.copy(
+                            processingGroupMemberIds = state.processingGroupMemberIds - newLeader.id,
+                            groupJoinRequestsByConversation = state.groupJoinRequestsByConversation - conversationId
+                        )
+                    }
+                    refreshConversations()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            processingGroupMemberIds = it.processingGroupMemberIds - newLeader.id,
+                            snackbarMessage = err.message ?: "Không thể chuyển quyền Trưởng nhóm."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    private fun applyUpdatedGroupMembers(
+        conversationId: Long,
+        members: List<GroupMemberDto>,
+        snackbar: String? = null
+    ) {
+        _uiState.update { state ->
+            val currentUsername = state.currentUser?.username
+            val myUpdatedRole = members.firstOrNull {
+                !currentUsername.isNullOrBlank() && it.username.equals(currentUsername, ignoreCase = true)
+            }?.role
+
+            val updatedMembersMap = state.groupMembersByConversation.toMutableMap().apply {
+                put(conversationId, members)
+            }
+            val updatedConvs = state.conversations.map { conv ->
+                if (conv.id == conversationId) {
+                    conv.copy(
+                        memberCount = members.size,
+                        members = members,
+                        currentUserRole = myUpdatedRole ?: conv.currentUserRole
+                    )
+                } else {
+                    conv
+                }
+            }
+            state.copy(
+                groupMembersByConversation = updatedMembersMap,
+                conversations = updatedConvs,
+                snackbarMessage = snackbar ?: state.snackbarMessage
+            )
+        }
+    }
+
+    fun loadGroupJoinRequests(conversationId: Long) {
+        viewModelScope.launch {
+            repository.getGroupJoinRequests(conversationId).onSuccess { requests ->
+                _uiState.update { state ->
+                    val updatedReqMap = state.groupJoinRequestsByConversation.toMutableMap().apply {
+                        put(conversationId, requests)
+                    }
+                    val updatedConvs = state.conversations.map { conv ->
+                        if (conv.id == conversationId) {
+                            conv.copy(pendingJoinRequestCount = requests.size)
+                        } else {
+                            conv
+                        }
+                    }
+                    state.copy(
+                        groupJoinRequestsByConversation = updatedReqMap,
+                        conversations = updatedConvs
+                    )
+                }
+            }
+        }
+    }
+
+    fun approveGroupJoinRequest(
+        conversationId: Long,
+        request: GroupJoinRequestDto
+    ) {
+        if (_uiState.value.processingJoinRequestIds.contains(request.id)) return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(processingJoinRequestIds = it.processingJoinRequestIds + request.id)
+            }
+            repository.approveGroupJoinRequest(conversationId, request.id).fold(
+                onSuccess = {
+                    _uiState.update { state ->
+                        val remaining = state.groupJoinRequestsByConversation[conversationId]
+                            .orEmpty()
+                            .filterNot { it.id == request.id }
+                        val updatedMap = state.groupJoinRequestsByConversation.toMutableMap().apply {
+                            put(conversationId, remaining)
+                        }
+                        val updatedConvs = state.conversations.map { conv ->
+                            if (conv.id == conversationId) {
+                                conv.copy(pendingJoinRequestCount = remaining.size)
+                            } else {
+                                conv
+                            }
+                        }
+                        state.copy(
+                            processingJoinRequestIds = state.processingJoinRequestIds - request.id,
+                            groupJoinRequestsByConversation = updatedMap,
+                            conversations = updatedConvs,
+                            snackbarMessage = "Đã duyệt ${request.displayName} vào nhóm."
+                        )
+                    }
+                    loadConversationMembers(conversationId)
+                    refreshConversations()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            processingJoinRequestIds = it.processingJoinRequestIds - request.id,
+                            snackbarMessage = err.message ?: "Không thể duyệt yêu cầu tham gia."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun rejectGroupJoinRequest(
+        conversationId: Long,
+        request: GroupJoinRequestDto
+    ) {
+        if (_uiState.value.processingJoinRequestIds.contains(request.id)) return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(processingJoinRequestIds = it.processingJoinRequestIds + request.id)
+            }
+            repository.rejectGroupJoinRequest(conversationId, request.id).fold(
+                onSuccess = {
+                    _uiState.update { state ->
+                        val remaining = state.groupJoinRequestsByConversation[conversationId]
+                            .orEmpty()
+                            .filterNot { it.id == request.id }
+                        val updatedMap = state.groupJoinRequestsByConversation.toMutableMap().apply {
+                            put(conversationId, remaining)
+                        }
+                        val updatedConvs = state.conversations.map { conv ->
+                            if (conv.id == conversationId) {
+                                conv.copy(pendingJoinRequestCount = remaining.size)
+                            } else {
+                                conv
+                            }
+                        }
+                        state.copy(
+                            processingJoinRequestIds = state.processingJoinRequestIds - request.id,
+                            groupJoinRequestsByConversation = updatedMap,
+                            conversations = updatedConvs,
+                            snackbarMessage = "Đã từ chối yêu cầu của ${request.displayName}."
+                        )
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            processingJoinRequestIds = it.processingJoinRequestIds - request.id,
+                            snackbarMessage = err.message ?: "Không thể từ chối yêu cầu tham gia."
                         )
                     }
                 }
@@ -875,21 +1435,10 @@ class MainChatViewModel(
     fun loadConversationMembers(conversationId: Long) {
         viewModelScope.launch {
             repository.getConversationMembers(conversationId).onSuccess { members ->
-                _uiState.update { state ->
-                    val updatedMembers = state.groupMembersByConversation.toMutableMap().apply {
-                        put(conversationId, members)
-                    }
-                    val updatedConvs = state.conversations.map { conv ->
-                        if (conv.id == conversationId) {
-                            conv.copy(memberCount = members.size, members = members)
-                        } else {
-                            conv
-                        }
-                    }
-                    state.copy(
-                        groupMembersByConversation = updatedMembers,
-                        conversations = updatedConvs
-                    )
+                applyUpdatedGroupMembers(conversationId = conversationId, members = members)
+                val conv = _uiState.value.conversations.firstOrNull { it.id == conversationId }
+                if (conv?.canManageGroupInvitesAndRequests == true) {
+                    loadGroupJoinRequests(conversationId)
                 }
             }
         }
@@ -1138,10 +1687,23 @@ class MainChatViewModel(
         return repository.resolveAssetUrl(rawUrl, _uiState.value.serverBaseUrl)
     }
 
-    fun deleteConversation(conversationId: Long, onDeleted: () -> Unit) {
+    fun deleteConversation(
+        conversationId: Long,
+        customNotice: String? = null,
+        onDeleted: () -> Unit
+    ) {
         viewModelScope.launch {
             repository.deleteConversation(conversationId).fold(
                 onSuccess = {
+                    val targetConv = _uiState.value.conversations.firstOrNull { it.id == conversationId }
+                    val defaultNotice = when {
+                        customNotice != null -> customNotice
+                        targetConv?.isGroup == true && targetConv.isCurrentUserGroupAdmin ->
+                            "Đã giải tán nhóm trò chuyện."
+                        targetConv?.isGroup == true ->
+                            "Đã rời khỏi nhóm trò chuyện."
+                        else -> "Đã xóa cuộc trò chuyện."
+                    }
                     val remaining = _uiState.value.conversations.filterNot { it.id == conversationId }
                     stompClient.syncConversationSubscriptions(remaining.map { it.id })
                     _uiState.update { state ->
@@ -1149,18 +1711,19 @@ class MainChatViewModel(
                             conversations = remaining,
                             messagesByConversation = state.messagesByConversation - conversationId,
                             groupMembersByConversation = state.groupMembersByConversation - conversationId,
+                            groupJoinRequestsByConversation = state.groupJoinRequestsByConversation - conversationId,
                             hasMoreByConversation = state.hasMoreByConversation - conversationId,
                             oldestMessageIdByConversation = state.oldestMessageIdByConversation - conversationId,
                             unreadCounts = state.unreadCounts - conversationId,
                             activeConversationId = if (state.activeConversationId == conversationId) null else state.activeConversationId,
-                            snackbarMessage = "Đã xóa cuộc trò chuyện."
+                            snackbarMessage = defaultNotice
                         )
                     }
                     onDeleted()
                 },
                 onFailure = { err ->
                     _uiState.update {
-                        it.copy(snackbarMessage = err.message ?: "Không thể xóa cuộc trò chuyện.")
+                        it.copy(snackbarMessage = err.message ?: "Không thể thực hiện thao tác.")
                     }
                 }
             )

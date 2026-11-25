@@ -41,6 +41,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.GroupAdd
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
@@ -51,6 +52,8 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SentimentSatisfiedAlt
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -103,6 +106,7 @@ import nhom3.chatbln.android.ui.components.AvatarView
 import nhom3.chatbln.android.ui.util.MarkdownLinkText
 import nhom3.chatbln.android.ui.util.extractFirstLink
 import nhom3.chatbln.android.ui.util.extractHostName
+import nhom3.chatbln.android.ui.util.extractInviteCodeFromMessageText
 import nhom3.chatbln.android.ui.util.formatMessageTime
 import nhom3.chatbln.android.ui.util.formatPresenceLabel
 import nhom3.chatbln.android.ui.viewmodel.MainChatViewModel
@@ -112,7 +116,8 @@ import nhom3.chatbln.android.ui.viewmodel.MainChatViewModel
 fun ChatRoomScreen(
     conversationId: Long,
     viewModel: MainChatViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToConversation: ((Long) -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -124,6 +129,7 @@ fun ChatRoomScreen(
     var showAttachmentMenu by remember { mutableStateOf(false) }
     var showEmojiSheet by rememberSaveable { mutableStateOf(false) }
     var showInfoSheet by rememberSaveable { mutableStateOf(false) }
+    var activeInviteCodeSheet by rememberSaveable { mutableStateOf<String?>(null) }
     var showSearchBar by rememberSaveable { mutableStateOf(false) }
     var previewImageUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var isSelectionMode by rememberSaveable { mutableStateOf(false) }
@@ -159,8 +165,15 @@ fun ChatRoomScreen(
     val allMessages = uiState.messagesByConversation[conversationId].orEmpty()
     val groupMembers = uiState.groupMembersByConversation[conversationId]
         ?: conversation.members.orEmpty()
+    val joinRequests = uiState.groupJoinRequestsByConversation[conversationId].orEmpty()
     val friendIdSet = remember(uiState.friends) { uiState.friends.map { it.id }.toSet() }
     val hasMore = uiState.hasMoreByConversation[conversationId] == true
+
+    val pendingJoinCount = if (conversation.isGroup && conversation.canManageGroupInvitesAndRequests) {
+        if (joinRequests.isNotEmpty()) joinRequests.size else (conversation.pendingJoinRequestCount ?: 0)
+    } else {
+        0
+    }
 
     LaunchedEffect(allMessages) {
         if (selectedMessageIds.isNotEmpty()) {
@@ -260,12 +273,57 @@ fun ChatRoomScreen(
         )
     }
 
+    activeInviteCodeSheet?.let { initialInvite ->
+        JoinGroupBottomSheet(
+            initialInput = initialInvite,
+            preview = uiState.invitePreview,
+            isLoadingPreview = uiState.isLoadingInvitePreview,
+            previewError = uiState.invitePreviewError,
+            isJoining = uiState.isJoiningGroupByInvite,
+            feedbackMessage = uiState.joinGroupFeedback,
+            feedbackIsError = uiState.joinGroupFeedbackIsError,
+            onPreview = viewModel::previewGroupInvite,
+            onJoin = { code ->
+                viewModel.joinGroupByInvite(rawInput = code) { joinedId ->
+                    activeInviteCodeSheet = null
+                    viewModel.clearGroupInviteDialogState()
+                    if (joinedId != conversationId) {
+                        if (onNavigateToConversation != null) {
+                            onNavigateToConversation(joinedId)
+                        } else {
+                            viewModel.openConversation(joinedId)
+                        }
+                    }
+                }
+            },
+            onOpenExistingGroup = { targetConvId ->
+                activeInviteCodeSheet = null
+                viewModel.clearGroupInviteDialogState()
+                if (targetConvId != conversationId) {
+                    if (onNavigateToConversation != null) {
+                        onNavigateToConversation(targetConvId)
+                    } else {
+                        viewModel.openConversation(targetConvId)
+                    }
+                }
+            },
+            onDismiss = {
+                activeInviteCodeSheet = null
+                viewModel.clearGroupInviteDialogState()
+            }
+        )
+    }
+
     if (showInfoSheet) {
         ConversationInfoSheet(
             conversation = conversation,
             messages = allMessages,
             currentUsername = uiState.currentUser?.username,
             groupMembers = groupMembers,
+            joinRequests = joinRequests,
+            isUpdatingGroupSettings = uiState.isUpdatingGroupSettings,
+            processingMemberIds = uiState.processingGroupMemberIds,
+            processingJoinRequestIds = uiState.processingJoinRequestIds,
             friendIds = friendIdSet,
             resolveAssetUrl = viewModel::resolveAssetUrl,
             onPreviewImage = { url ->
@@ -298,7 +356,11 @@ fun ChatRoomScreen(
                     fallbackOnline = member.isOnline,
                     onReady = { nextId ->
                         if (nextId != conversationId) {
-                            viewModel.openConversation(nextId)
+                            if (onNavigateToConversation != null) {
+                                onNavigateToConversation(nextId)
+                            } else {
+                                viewModel.openConversation(nextId)
+                            }
                         }
                     }
                 )
@@ -307,6 +369,40 @@ fun ChatRoomScreen(
                 viewModel.sendFriendRequestById(
                     targetUserId = member.id,
                     displayName = member.displayName
+                )
+            },
+            onUpdateGroupVisibility = { visibility ->
+                viewModel.updateGroupVisibility(
+                    conversationId = conversationId,
+                    groupVisibility = visibility
+                )
+            },
+            onRegenerateInviteCode = {
+                viewModel.regenerateGroupInviteCode(conversationId = conversationId)
+            },
+            onApproveJoinRequest = { req ->
+                viewModel.approveGroupJoinRequest(
+                    conversationId = conversationId,
+                    request = req
+                )
+            },
+            onRejectJoinRequest = { req ->
+                viewModel.rejectGroupJoinRequest(
+                    conversationId = conversationId,
+                    request = req
+                )
+            },
+            onUpdateMemberRole = { member, nextRole ->
+                viewModel.updateGroupMemberRole(
+                    conversationId = conversationId,
+                    targetMember = member,
+                    nextRole = nextRole
+                )
+            },
+            onTransferLeadership = { member ->
+                viewModel.transferGroupLeadership(
+                    conversationId = conversationId,
+                    newLeader = member
                 )
             },
             onDeleteConversation = {
@@ -354,7 +450,7 @@ fun ChatRoomScreen(
                         text = if (canDeleteForEveryone) {
                             "Chọn cách xóa tin nhắn trong cuộc trò chuyện này:"
                         } else {
-                            "Trong nhóm trò chuyện, bạn chỉ có thể thu hồi tin nhắn của chính mình (hoặc khi là quản trị viên). Bạn vẫn có thể xóa ở phía mình:"
+                            "Trong nhóm trò chuyện, bạn chỉ có thể thu hồi tin nhắn của chính mình (hoặc khi là Trưởng nhóm). Bạn vẫn có thể xóa ở phía mình:"
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -494,7 +590,8 @@ fun ChatRoomScreen(
     val roomTitle = conversation.name?.takeIf { it.isNotBlank() } ?: "Hội thoại #$conversationId"
     val roomSubtitle = if (conversation.isGroup) {
         val count = groupMembers.size.takeIf { it > 0 } ?: conversation.memberCount ?: 0
-        if (count > 0) "$count thành viên" else "Nhóm trò chuyện"
+        val countLabel = if (count > 0) "$count thành viên" else "Nhóm trò chuyện"
+        "$countLabel · ${conversation.groupVisibilityLabel}"
     } else {
         formatPresenceLabel(conversation.isOnline, conversation.lastSeen, conversation.presenceStatus)
     }
@@ -579,10 +676,22 @@ fun ChatRoomScreen(
                             )
                         }
                         IconButton(onClick = { showInfoSheet = true }) {
-                            Icon(
-                                imageVector = Icons.Outlined.Info,
-                                contentDescription = "Thông tin hội thoại"
-                            )
+                            BadgedBox(
+                                badge = {
+                                    if (pendingJoinCount > 0) {
+                                        Badge {
+                                            Text(
+                                                if (pendingJoinCount > 99) "99+" else pendingJoinCount.toString()
+                                            )
+                                        }
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Info,
+                                    contentDescription = "Thông tin hội thoại"
+                                )
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -979,6 +1088,10 @@ fun ChatRoomScreen(
                                 onLongPressMessage = {
                                     pendingDeleteIds = listOf(message.id)
                                 },
+                                onOpenGroupInvite = { inviteCode ->
+                                    viewModel.clearGroupInviteDialogState()
+                                    activeInviteCodeSheet = inviteCode
+                                },
                                 resolveAssetUrl = viewModel::resolveAssetUrl,
                                 onPreviewImage = { previewImageUrl = it }
                             )
@@ -999,6 +1112,7 @@ private fun MessageBubbleItem(
     isSelected: Boolean,
     onToggleSelect: () -> Unit,
     onLongPressMessage: () -> Unit,
+    onOpenGroupInvite: (String) -> Unit,
     resolveAssetUrl: (String?) -> String?,
     onPreviewImage: (String) -> Unit
 ) {
@@ -1019,6 +1133,10 @@ private fun MessageBubbleItem(
     }
     val hasCustomBodyText = message.content.isNotBlank() &&
         (resolvedAttachmentUrl == null || message.content.trim() != autoPlaceholderText)
+
+    val detectedInviteCode = remember(message.content, message.attachmentUrl) {
+        extractInviteCodeFromMessageText(message.content, message.attachmentUrl)
+    }
 
     val detectedLink = remember(message.content, attachmentType, message.attachmentUrl) {
         if (attachmentType == "LINK" && !message.attachmentUrl.isNullOrBlank()) {
@@ -1113,7 +1231,6 @@ private fun MessageBubbleItem(
                 horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
                 modifier = Modifier.widthIn(max = if (isSelectionMode) 268.dp else 300.dp)
             ) {
-                // Sender name header shown cleanly for both group and private conversations
                 Text(
                     text = senderLabel,
                     style = MaterialTheme.typography.labelSmall,
@@ -1242,12 +1359,34 @@ private fun MessageBubbleItem(
                                     text = message.content,
                                     style = MaterialTheme.typography.bodyMedium,
                                     textColor = bubbleTextColor,
-                                    linkColor = bubbleLinkColor
+                                    linkColor = bubbleLinkColor,
+                                    onInviteCodeClick = onOpenGroupInvite
                                 )
                             }
                         }
 
-                        if (detectedLink != null && attachmentType != "IMAGE" && attachmentType != "VIDEO" && attachmentType != "FILE") {
+                        if (detectedInviteCode != null) {
+                            AttachmentActionRow(
+                                icon = Icons.Outlined.GroupAdd,
+                                title = "Lời mời tham gia nhóm",
+                                subtitle = "Mã mời: $detectedInviteCode · Nhấn để xem & tham gia",
+                                isMe = isMe,
+                                onClick = {
+                                    if (isSelectionMode) {
+                                        onToggleSelect()
+                                    } else {
+                                        onOpenGroupInvite(detectedInviteCode)
+                                    }
+                                },
+                                onLongClick = {
+                                    if (isSelectionMode) {
+                                        onToggleSelect()
+                                    } else {
+                                        onLongPressMessage()
+                                    }
+                                }
+                            )
+                        } else if (detectedLink != null && attachmentType != "IMAGE" && attachmentType != "VIDEO" && attachmentType != "FILE") {
                             val (url, label, host) = detectedLink
                             AttachmentActionRow(
                                 icon = Icons.Outlined.Link,

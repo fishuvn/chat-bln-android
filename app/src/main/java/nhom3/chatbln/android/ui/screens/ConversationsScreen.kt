@@ -23,6 +23,8 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.GroupAdd
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.UnfoldMore
@@ -77,9 +79,13 @@ fun ConversationsScreen(
     onChangePresenceMode: (UserPresenceMode) -> Unit,
     onConversationClick: (Long) -> Unit,
     onStartPrivateChat: (FriendResponse) -> Unit,
-    onCreateGroupChat: (name: String, memberIds: List<Long>) -> Unit
+    onCreateGroupChat: (name: String, memberIds: List<Long>, groupVisibility: String) -> Unit,
+    onPreviewGroupInvite: (String) -> Unit,
+    onJoinGroupByInvite: (String) -> Unit,
+    onClearInviteDialog: () -> Unit
 ) {
     var showNewChatSheet by rememberSaveable { mutableStateOf(false) }
+    var showJoinByLinkSheet by rememberSaveable { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
     val isDarkSurface = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val connectedDotColor = if (isDarkSurface) OnlineIndicatorDark else OnlineIndicatorLight
@@ -124,9 +130,36 @@ fun ConversationsScreen(
                 showNewChatSheet = false
                 onStartPrivateChat(friend)
             },
-            onCreateGroup = { groupName, memberIds ->
+            onCreateGroup = { groupName, memberIds, groupVisibility ->
                 showNewChatSheet = false
-                onCreateGroupChat(groupName, memberIds)
+                onCreateGroupChat(groupName, memberIds, groupVisibility)
+            },
+            onOpenJoinByInvite = {
+                showNewChatSheet = false
+                onClearInviteDialog()
+                showJoinByLinkSheet = true
+            }
+        )
+    }
+
+    if (showJoinByLinkSheet) {
+        JoinGroupBottomSheet(
+            preview = uiState.invitePreview,
+            isLoadingPreview = uiState.isLoadingInvitePreview,
+            previewError = uiState.invitePreviewError,
+            isJoining = uiState.isJoiningGroupByInvite,
+            feedbackMessage = uiState.joinGroupFeedback,
+            feedbackIsError = uiState.joinGroupFeedbackIsError,
+            onPreview = onPreviewGroupInvite,
+            onJoin = onJoinGroupByInvite,
+            onOpenExistingGroup = { convId ->
+                showJoinByLinkSheet = false
+                onClearInviteDialog()
+                onConversationClick(convId)
+            },
+            onDismiss = {
+                showJoinByLinkSheet = false
+                onClearInviteDialog()
             }
         )
     }
@@ -194,6 +227,18 @@ fun ConversationsScreen(
                                 )
                             }
                         }
+                    }
+
+                    IconButton(
+                        onClick = {
+                            onClearInviteDialog()
+                            showJoinByLinkSheet = true
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.GroupAdd,
+                            contentDescription = "Tham gia nhóm bằng link / mã mời"
+                        )
                     }
 
                     IconButton(onClick = onRefresh) {
@@ -308,7 +353,7 @@ fun ConversationsScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (uiState.conversationSearchQuery.isBlank()) {
-                                "Chọn bạn bè hoặc tạo nhóm mới để bắt đầu nhắn tin."
+                                "Chọn bạn bè, tạo nhóm mới hoặc tham gia bằng mã mời."
                             } else {
                                 "Hãy thử từ khóa khác."
                             },
@@ -317,8 +362,18 @@ fun ConversationsScreen(
                         )
                         if (uiState.conversationSearchQuery.isBlank()) {
                             Spacer(modifier = Modifier.height(12.dp))
-                            TextButton(onClick = { showNewChatSheet = true }) {
-                                Text("Bắt đầu trò chuyện ngay")
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = { showNewChatSheet = true }) {
+                                    Text("Bắt đầu trò chuyện")
+                                }
+                                TextButton(
+                                    onClick = {
+                                        onClearInviteDialog()
+                                        showJoinByLinkSheet = true
+                                    }
+                                ) {
+                                    Text("Tham gia bằng mã mời")
+                                }
                             }
                         }
                     }
@@ -377,6 +432,11 @@ private fun ConversationRow(
     }
 
     val timeLabel = formatConversationListTime(item.lastMessageTime)
+    val pendingApprovals = if (item.isGroup && item.canManageGroupInvitesAndRequests) {
+        item.pendingJoinRequestCount ?: 0
+    } else {
+        0
+    }
 
     Row(
         modifier = Modifier
@@ -406,15 +466,28 @@ private fun ConversationRow(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = if (unreadCount > 0) FontWeight.Bold else FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                     modifier = Modifier.weight(1f)
-                )
+                ) {
+                    if (item.isGroup && item.isPrivateGroup) {
+                        Icon(
+                            imageVector = Icons.Outlined.Lock,
+                            contentDescription = "Nhóm riêng tư",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = if (unreadCount > 0) FontWeight.Bold else FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 if (timeLabel.isNotEmpty()) {
                     Spacer(modifier = Modifier.width(8.dp))
@@ -447,6 +520,21 @@ private fun ConversationRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
+
+                if (pendingApprovals > 0) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = RoundedCornerShape(999.dp)
+                    ) {
+                        Text(
+                            text = "$pendingApprovals chờ duyệt",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                        )
+                    }
+                }
 
                 if (unreadCount > 0) {
                     Spacer(modifier = Modifier.width(8.dp))

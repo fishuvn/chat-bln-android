@@ -171,7 +171,12 @@ private fun ChatBlnRootNavHost(
             ChatRoomScreen(
                 conversationId = convId,
                 viewModel = mainChatViewModel,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToConversation = { nextId ->
+                    navController.navigate(Routes.chatRoom(nextId)) {
+                        popUpTo(Routes.MAIN)
+                    }
+                }
             )
         }
     }

@@ -2,6 +2,12 @@ package nhom3.chatbln.android.data.model
 
 import com.google.gson.annotations.SerializedName
 
+fun formatGroupRoleLabel(role: String?): String = when (role?.trim()?.uppercase()) {
+    "ADMIN" -> "Trưởng nhóm"
+    "DEPUTY" -> "Phó nhóm"
+    else -> "Thành viên"
+}
+
 data class CachedUser(
     @SerializedName("id") val id: Long,
     @SerializedName("username") val username: String,
@@ -98,6 +104,9 @@ data class ConversationItemResponse(
     @SerializedName("id") val id: Long,
     @SerializedName("name") val name: String? = null,
     @SerializedName("type") val type: String = "PRIVATE",
+    @SerializedName("groupVisibility") val groupVisibility: String? = null,
+    @SerializedName("inviteCode") val inviteCode: String? = null,
+    @SerializedName("pendingJoinRequestCount") val pendingJoinRequestCount: Int? = null,
     @SerializedName("avatarUrl") val avatarUrl: String? = null,
     @SerializedName(value = "isOnline", alternate = ["online"]) val isOnline: Boolean? = false,
     @SerializedName("presenceStatus") val presenceStatus: String? = null,
@@ -125,6 +134,21 @@ data class ConversationItemResponse(
     val isCurrentUserGroupAdmin: Boolean
         get() = currentUserRole.equals("ADMIN", ignoreCase = true)
 
+    val isCurrentUserGroupDeputy: Boolean
+        get() = currentUserRole.equals("DEPUTY", ignoreCase = true)
+
+    val canManageGroupInvitesAndRequests: Boolean
+        get() = isCurrentUserGroupAdmin || isCurrentUserGroupDeputy
+
+    val isPrivateGroup: Boolean
+        get() = groupVisibility.equals("PRIVATE", ignoreCase = true)
+
+    val groupVisibilityLabel: String
+        get() = if (isPrivateGroup) "Nhóm riêng tư" else "Nhóm công khai"
+
+    val currentUserRoleLabel: String
+        get() = formatGroupRoleLabel(currentUserRole)
+
     val isUnfriendedPrivate: Boolean
         get() = !isGroup && isFriend == false
 }
@@ -145,6 +169,12 @@ data class GroupMemberDto(
 
     val isAdmin: Boolean
         get() = role.equals("ADMIN", ignoreCase = true)
+
+    val isDeputy: Boolean
+        get() = role.equals("DEPUTY", ignoreCase = true)
+
+    val roleLabel: String
+        get() = formatGroupRoleLabel(role)
 }
 
 data class FriendshipEventDto(
@@ -174,16 +204,72 @@ data class CreatePrivateConversationRequest(
 
 data class CreateGroupConversationRequest(
     @SerializedName("name") val name: String,
-    @SerializedName("memberIds") val memberIds: List<Long>
+    @SerializedName("memberIds") val memberIds: List<Long> = emptyList(),
+    @SerializedName("groupVisibility") val groupVisibility: String = "PUBLIC"
 )
 
 data class ConversationResponse(
     @SerializedName("id") val id: Long,
     @SerializedName("name") val name: String? = null,
     @SerializedName("type") val type: String = "PRIVATE",
+    @SerializedName("groupVisibility") val groupVisibility: String? = null,
+    @SerializedName("inviteCode") val inviteCode: String? = null,
     @SerializedName("createdById") val createdById: Long? = null,
     @SerializedName("createdAt") val createdAt: String? = null
 )
+
+data class UpdateGroupVisibilityRequest(
+    @SerializedName("groupVisibility") val groupVisibility: String
+)
+
+data class RegenerateInviteCodeResponse(
+    @SerializedName("conversationId") val conversationId: Long,
+    @SerializedName("inviteCode") val inviteCode: String,
+    @SerializedName("groupVisibility") val groupVisibility: String? = null
+)
+
+data class UpdateMemberRoleRequest(
+    @SerializedName("role") val role: String
+)
+
+data class TransferGroupLeaderRequest(
+    @SerializedName("newLeaderUserId") val newLeaderUserId: Long
+)
+
+data class GroupInvitePreviewResponse(
+    @SerializedName("conversationId") val conversationId: Long,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("groupVisibility") val groupVisibility: String = "PUBLIC",
+    @SerializedName("inviteCode") val inviteCode: String,
+    @SerializedName("memberCount") val memberCount: Int = 0,
+    @SerializedName(value = "alreadyMember", alternate = ["isAlreadyMember"]) val alreadyMember: Boolean = false,
+    @SerializedName("joinStatus") val joinStatus: String = "NONE"
+) {
+    val isPrivateGroup: Boolean
+        get() = groupVisibility.equals("PRIVATE", ignoreCase = true)
+}
+
+data class JoinGroupResponse(
+    @SerializedName("conversationId") val conversationId: Long,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("groupVisibility") val groupVisibility: String? = null,
+    @SerializedName("status") val status: String,
+    @SerializedName("message") val message: String? = null
+)
+
+data class GroupJoinRequestDto(
+    @SerializedName("id") val id: Long,
+    @SerializedName("conversationId") val conversationId: Long,
+    @SerializedName("userId") val userId: Long,
+    @SerializedName("username") val username: String,
+    @SerializedName("fullName") val fullName: String? = null,
+    @SerializedName("avatarUrl") val avatarUrl: String? = null,
+    @SerializedName("status") val status: String = "PENDING",
+    @SerializedName("createdAt") val createdAt: String? = null
+) {
+    val displayName: String
+        get() = fullName?.takeIf { it.isNotBlank() } ?: username
+}
 
 data class SenderDto(
     @SerializedName("id") val id: Long,

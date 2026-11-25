@@ -10,13 +10,20 @@ import nhom3.chatbln.android.data.model.DeleteMessagesResponse
 import nhom3.chatbln.android.data.model.FriendRequestDto
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.data.model.FriendshipResponse
+import nhom3.chatbln.android.data.model.GroupInvitePreviewResponse
+import nhom3.chatbln.android.data.model.GroupJoinRequestDto
 import nhom3.chatbln.android.data.model.GroupMemberDto
+import nhom3.chatbln.android.data.model.JoinGroupResponse
 import nhom3.chatbln.android.data.model.LoginRequest
 import nhom3.chatbln.android.data.model.LogoutResponse
 import nhom3.chatbln.android.data.model.MessageDto
 import nhom3.chatbln.android.data.model.MessageHistoryResponse
+import nhom3.chatbln.android.data.model.RegenerateInviteCodeResponse
 import nhom3.chatbln.android.data.model.RegisterRequest
 import nhom3.chatbln.android.data.model.SendMessageRequest
+import nhom3.chatbln.android.data.model.TransferGroupLeaderRequest
+import nhom3.chatbln.android.data.model.UpdateGroupVisibilityRequest
+import nhom3.chatbln.android.data.model.UpdateMemberRoleRequest
 import nhom3.chatbln.android.data.model.UpdatePresenceRequest
 import nhom3.chatbln.android.data.model.UpdateProfileRequest
 import nhom3.chatbln.android.data.model.UploadResponse
@@ -78,6 +85,61 @@ interface ChatBlnApiService {
     suspend fun getConversationMembers(
         @Path("id") conversationId: Long
     ): List<GroupMemberDto>
+
+    @PUT("conversations/{id}/visibility")
+    suspend fun updateGroupVisibility(
+        @Path("id") conversationId: Long,
+        @Body request: UpdateGroupVisibilityRequest
+    ): ConversationResponse
+
+    @POST("conversations/{id}/invite-code/regenerate")
+    suspend fun regenerateInviteCode(
+        @Path("id") conversationId: Long,
+        @Body emptyBody: Map<String, String> = emptyMap()
+    ): RegenerateInviteCodeResponse
+
+    @PUT("conversations/{id}/members/{targetUserId}/role")
+    suspend fun updateGroupMemberRole(
+        @Path("id") conversationId: Long,
+        @Path("targetUserId") targetUserId: Long,
+        @Body request: UpdateMemberRoleRequest
+    ): List<GroupMemberDto>
+
+    @PUT("conversations/{id}/leader")
+    suspend fun transferGroupLeadership(
+        @Path("id") conversationId: Long,
+        @Body request: TransferGroupLeaderRequest
+    ): List<GroupMemberDto>
+
+    @GET("conversations/invite/{inviteCode}")
+    suspend fun getGroupInvitePreview(
+        @Path("inviteCode") inviteCode: String
+    ): GroupInvitePreviewResponse
+
+    @POST("conversations/join/{inviteCode}")
+    suspend fun joinGroupByInviteCode(
+        @Path("inviteCode") inviteCode: String,
+        @Body emptyBody: Map<String, String> = emptyMap()
+    ): JoinGroupResponse
+
+    @GET("conversations/{id}/join-requests")
+    suspend fun getGroupJoinRequests(
+        @Path("id") conversationId: Long
+    ): List<GroupJoinRequestDto>
+
+    @PUT("conversations/{id}/join-requests/{requestId}/approve")
+    suspend fun approveGroupJoinRequest(
+        @Path("id") conversationId: Long,
+        @Path("requestId") requestId: Long,
+        @Body emptyBody: Map<String, String> = emptyMap()
+    ): GroupJoinRequestDto
+
+    @PUT("conversations/{id}/join-requests/{requestId}/reject")
+    suspend fun rejectGroupJoinRequest(
+        @Path("id") conversationId: Long,
+        @Path("requestId") requestId: Long,
+        @Body emptyBody: Map<String, String> = emptyMap()
+    ): GroupJoinRequestDto
 
     @GET("conversations/{id}/messages")
     suspend fun getMessages(

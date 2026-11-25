@@ -39,9 +39,50 @@ private val MarkdownPairRegex = Regex(
     RegexOption.IGNORE_CASE
 )
 
+private val JoinUrlInviteCodeRegex = Regex(
+    """/join/([A-Za-z0-9_-]{4,64})""",
+    RegexOption.IGNORE_CASE
+)
+
+private val BareGroupCodeRegex = Regex(
+    """^(grp_[A-Za-z0-9_-]{3,60})$""",
+    RegexOption.IGNORE_CASE
+)
+
+fun buildGroupShareLink(inviteCode: String): String {
+    return "https://chat-bln.fishu.io.vn/join/${inviteCode.trim()}"
+}
+
+fun parseInviteCodeInput(rawInput: String?): String? {
+    val trimmed = rawInput?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    JoinUrlInviteCodeRegex.find(trimmed)?.groupValues?.getOrNull(1)?.let { code ->
+        return code.trim()
+    }
+    val cleaned = trimmed
+        .substringBefore('?')
+        .substringBefore('#')
+        .trimEnd('/', '.', ',', ';', ')')
+        .substringAfterLast('/')
+        .trim()
+    if (cleaned.isEmpty()) return null
+    return cleaned.takeIf { it.matches(Regex("""^[A-Za-z0-9_-]{4,64}$""")) }
+}
+
+fun extractInviteCodeFromMessageText(text: String?, attachmentUrl: String? = null): String? {
+    if (!attachmentUrl.isNullOrBlank()) {
+        JoinUrlInviteCodeRegex.find(attachmentUrl)?.groupValues?.getOrNull(1)?.let { return it }
+    }
+    if (text.isNullOrBlank()) return null
+    JoinUrlInviteCodeRegex.find(text)?.groupValues?.getOrNull(1)?.let { return it }
+    val trimmed = text.trim()
+    BareGroupCodeRegex.matchEntire(trimmed)?.groupValues?.getOrNull(1)?.let { return it }
+    return null
+}
+
 fun buildMarkdownAnnotatedString(
     rawText: String,
-    linkColor: Color
+    linkColor: Color,
+    onInviteCodeClick: ((String) -> Unit)? = null
 ): AnnotatedString = buildAnnotatedString {
     if (rawText.isEmpty()) return@buildAnnotatedString
 
@@ -64,14 +105,42 @@ fun buildMarkdownAnnotatedString(
         if (mdMatch != null) {
             val label = mdMatch.groupValues[1].ifBlank { mdMatch.groupValues[2] }
             val url = mdMatch.groupValues[2]
-            withLink(LinkAnnotation.Url(url = url, styles = linkStyles)) {
-                append(label)
+            val inviteCode = JoinUrlInviteCodeRegex.find(url)?.groupValues?.getOrNull(1)
+            if (inviteCode != null && onInviteCodeClick != null) {
+                withLink(
+                    LinkAnnotation.Clickable(
+                        tag = "JOIN_GROUP_$inviteCode",
+                        styles = linkStyles
+                    ) {
+                        onInviteCodeClick(inviteCode)
+                    }
+                ) {
+                    append(label)
+                }
+            } else {
+                withLink(LinkAnnotation.Url(url = url, styles = linkStyles)) {
+                    append(label)
+                }
             }
         } else {
             val cleanUrl = token.trimEnd('.', ',', ';', ')')
             val trailingPunctuation = token.substring(cleanUrl.length)
-            withLink(LinkAnnotation.Url(url = cleanUrl, styles = linkStyles)) {
-                append(cleanUrl)
+            val inviteCode = JoinUrlInviteCodeRegex.find(cleanUrl)?.groupValues?.getOrNull(1)
+            if (inviteCode != null && onInviteCodeClick != null) {
+                withLink(
+                    LinkAnnotation.Clickable(
+                        tag = "JOIN_GROUP_$inviteCode",
+                        styles = linkStyles
+                    ) {
+                        onInviteCodeClick(inviteCode)
+                    }
+                ) {
+                    append(cleanUrl)
+                }
+            } else {
+                withLink(LinkAnnotation.Url(url = cleanUrl, styles = linkStyles)) {
+                    append(cleanUrl)
+                }
             }
             if (trailingPunctuation.isNotEmpty()) {
                 append(trailingPunctuation)
@@ -91,10 +160,15 @@ fun MarkdownLinkText(
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyMedium,
     textColor: Color = MaterialTheme.colorScheme.onSurface,
-    linkColor: Color = MaterialTheme.colorScheme.primary
+    linkColor: Color = MaterialTheme.colorScheme.primary,
+    onInviteCodeClick: ((String) -> Unit)? = null
 ) {
-    val annotated = remember(text, linkColor) {
-        buildMarkdownAnnotatedString(rawText = text, linkColor = linkColor)
+    val annotated = remember(text, linkColor, onInviteCodeClick) {
+        buildMarkdownAnnotatedString(
+            rawText = text,
+            linkColor = linkColor,
+            onInviteCodeClick = onInviteCodeClick
+        )
     }
     Text(
         text = annotated,

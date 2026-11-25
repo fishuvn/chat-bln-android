@@ -3,6 +3,8 @@ package nhom3.chatbln.android.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,14 +13,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,7 +51,7 @@ import androidx.compose.ui.unit.dp
 import nhom3.chatbln.android.data.model.FriendResponse
 import nhom3.chatbln.android.ui.components.AvatarView
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun NewChatBottomSheet(
     friends: List<FriendResponse>,
@@ -52,11 +59,13 @@ fun NewChatBottomSheet(
     resolveAssetUrl: (String?) -> String?,
     onDismiss: () -> Unit,
     onSelectFriendForPrivateChat: (FriendResponse) -> Unit,
-    onCreateGroup: (groupName: String, memberIds: List<Long>) -> Unit
+    onCreateGroup: (groupName: String, memberIds: List<Long>, groupVisibility: String) -> Unit,
+    onOpenJoinByInvite: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var isGroupMode by rememberSaveable { mutableStateOf(false) }
     var groupName by rememberSaveable { mutableStateOf("") }
+    var groupVisibility by rememberSaveable { mutableStateOf("PUBLIC") }
     var filterQuery by rememberSaveable { mutableStateOf("") }
     val selectedMemberIds = remember { mutableStateListOf<Long>() }
 
@@ -90,13 +99,20 @@ fun NewChatBottomSheet(
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 FilterChip(
                     selected = !isGroupMode,
                     onClick = { isGroupMode = false },
                     label = { Text("Trò chuyện 1-1") },
                     leadingIcon = {
-                        Icon(imageVector = Icons.Outlined.Person, contentDescription = null)
+                        Icon(
+                            imageVector = Icons.Outlined.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 )
                 FilterChip(
@@ -104,7 +120,22 @@ fun NewChatBottomSheet(
                     onClick = { isGroupMode = true },
                     label = { Text("Tạo nhóm") },
                     leadingIcon = {
-                        Icon(imageVector = Icons.Outlined.Groups, contentDescription = null)
+                        Icon(
+                            imageVector = Icons.Outlined.Groups,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
+                AssistChip(
+                    onClick = onOpenJoinByInvite,
+                    label = { Text("Tham gia bằng mã mời") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Link,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 )
             }
@@ -118,43 +149,103 @@ fun NewChatBottomSheet(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Chế độ hiển thị nhóm",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = groupVisibility == "PUBLIC",
+                            onClick = { groupVisibility = "PUBLIC" },
+                            label = { Text("Nhóm công khai") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.Public,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                        )
+                        FilterChip(
+                            selected = groupVisibility == "PRIVATE",
+                            onClick = { groupVisibility = "PRIVATE" },
+                            label = { Text("Nhóm riêng tư") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.Lock,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                        )
+                    }
+                    Text(
+                        text = if (groupVisibility == "PRIVATE") {
+                            "Người có link mời cần Trưởng nhóm hoặc Phó nhóm phê duyệt trước khi vào nhóm."
+                        } else {
+                            "Ai có liên kết mời đều có thể tham gia nhóm ngay lập tức."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
-            OutlinedTextField(
-                value = filterQuery,
-                onValueChange = { filterQuery = it },
-                placeholder = { Text("Lọc bạn bè theo tên hoặc @username...") },
-                leadingIcon = {
-                    Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (friends.isNotEmpty()) {
+                OutlinedTextField(
+                    value = filterQuery,
+                    onValueChange = { filterQuery = it },
+                    placeholder = {
+                        Text(
+                            if (isGroupMode) {
+                                "Chọn thêm bạn bè (không bắt buộc — có thể mời bằng link sau)..."
+                            } else {
+                                "Lọc bạn bè theo tên hoặc @username..."
+                            }
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             if (friends.isEmpty()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 28.dp),
+                        .padding(vertical = 20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Danh bạ bạn bè đang trống",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Hãy chuyển sang mục Danh bạ để tìm và kết bạn trước.",
+                        text = if (isGroupMode) {
+                            "Chưa có bạn bè trong danh bạ — bạn vẫn có thể tạo nhóm và chia sẻ link mời."
+                        } else {
+                            "Danh bạ bạn bè đang trống"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (!isGroupMode) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Hãy chuyển sang mục Danh bạ để tìm và kết bạn trước.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 320.dp),
+                        .heightIn(max = 260.dp),
                     contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
                     items(items = filteredFriends, key = { it.id }) { friend ->
@@ -225,17 +316,25 @@ fun NewChatBottomSheet(
             if (isGroupMode) {
                 Button(
                     onClick = {
-                        onCreateGroup(groupName.trim(), selectedMemberIds.toList())
+                        onCreateGroup(
+                            groupName.trim(),
+                            selectedMemberIds.toList(),
+                            groupVisibility
+                        )
                     },
-                    enabled = !isSubmitting &&
-                        groupName.trim().isNotEmpty() &&
-                        selectedMemberIds.isNotEmpty(),
+                    enabled = !isSubmitting && groupName.trim().isNotEmpty(),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
                 ) {
-                    Text("Tạo nhóm (${selectedMemberIds.size} thành viên)")
+                    Text(
+                        if (selectedMemberIds.isEmpty()) {
+                            "Tạo nhóm (mời qua link)"
+                        } else {
+                            "Tạo nhóm (${selectedMemberIds.size} bạn bè)"
+                        }
+                    )
                 }
             }
         }
