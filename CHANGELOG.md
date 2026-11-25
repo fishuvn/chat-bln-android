@@ -2,6 +2,14 @@
 
 Quy ước phiên bản: `1.0.x` / `1.x.x` cho các bản cập nhật và sửa lỗi nhỏ (mỗi bậc tối đa `10`, ví dụ `1.0.10` → `1.1.0`); `x.0.0` dành cho thay đổi lớn về kiến trúc, ngôn ngữ lập trình, nâng phiên bản HĐH tối thiểu hoặc đại tu UI/UX.
 
+## v2.0.0 — Chat BLN Android (2026-11-26 02:18 UTC+7)
+
+- **Phiên bản**: `v2.0.0` (Build `20000`)
+- **Phân loại**: Cập nhật lớn (`x.0.0` — Kiến trúc / Ngôn ngữ / HĐH / Đại tu UI-UX)
+
+### 🚀 Thay đổi lớn (Cấu trúc / HĐH / UI-UX)
+- ui!: complete minimalist Material 3 adaptive redesign, dynamic color, forgot-password OTP, and LazyColumn optimization (`68a8c95`)
+
 ## v1.0.2 — Chat BLN Android (2026-11-26 01:31 UTC+7)
 
 - **Phiên bản**: `v1.0.2` (Build `10002`)
