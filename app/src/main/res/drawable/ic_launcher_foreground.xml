@@ -4,10 +4,23 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Chat BLN Signal Aperture (scaled inside 66dp Adaptive Icon safe zone) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M54,31C41.85,31 32,40.4 32,52C32,56.5 33.48,60.65 36.02,64.08L32.78,72.18C32.35,73.25 33.4,74.3 34.47,73.86L43.18,70.36C46.45,72.02 50.13,73 54,73C66.15,73 76,63.6 76,52C76,49.12 75.38,46.38 74.28,43.88" />
+    <!-- Ascending Precision Signal Bars -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M34,33h40c4.42,0 8,3.58 8,8v22c0,4.42 -3.58,8 -8,8H48l-11,9v-9h-3c-4.42,0 -8,-3.58 -8,-8V41c0,-4.42 3.58,-8 8,-8z" />
+        android:pathData="M46.5,48.5a2.7,2.7 0 0,1 2.7,2.7v6.6a2.7,2.7 0 0,1 -5.4,0v-6.6a2.7,2.7 0 0,1 2.7,-2.7z" />
     <path
-        android:fillColor="#0B57D0"
-        android:pathData="M38,46h32v4H38zM38,55h22v4H38z" />
+        android:fillColor="#FFFFFF"
+        android:pathData="M56.5,42.5a2.7,2.7 0 0,1 2.7,2.7v12.6a2.7,2.7 0 0,1 -5.4,0v-12.6a2.7,2.7 0 0,1 2.7,-2.7z" />
+    <!-- Live Sky-Cyan Realtime Beacon Dot -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M69,37m-5.5,0a5.5,5.5 0 1,0 11,0a5.5,5.5 0 1,0 -11,0" />
 </vector>

@@ -6,8 +6,18 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,7 +33,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.outlined.Bedtime
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.DoNotDisturbOn
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -136,29 +145,73 @@ fun resolvePeerPresenceIcon(
     }
 }
 
+/**
+ * Unified Chat BLN "Signal Aperture" Brand Mark — pixel-consistent with Web `logo.svg`,
+ * Android `ic_launcher_foreground.xml`, and iOS `ChatBLNBrandMark`.
+ */
 @Composable
 fun QuietSignalBrandMark(
     modifier: Modifier = Modifier,
-    size: Dp = 52.dp
+    size: Dp = 56.dp
 ) {
+    val cornerRadius = (size.value * 0.25f).dp
     Box(
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant,
-                shape = RoundedCornerShape(14.dp)
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(Color(0xFF1758EE), Color(0xFF0A369D))
+                )
             ),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = Icons.Outlined.ChatBubbleOutline,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-            modifier = Modifier.size((size.value * 0.50f).dp)
-        )
+        Canvas(modifier = Modifier.size(size)) {
+            val w = this.size.width
+            val h = this.size.height
+            val cx = w * 0.50f
+            val cy = h * 0.515f
+            val r = w * 0.275f
+            val strokeW = w * 0.072f
+
+            // Open geometric chat aperture arc with bottom-left speech tail
+            val arcRect = androidx.compose.ui.geometry.Rect(cx - r, cy - r, cx + r, cy + r)
+            val path = Path().apply {
+                arcTo(arcRect, startAngleDegrees = -12f, sweepAngleDegrees = 130f, forceMoveTo = true)
+                lineTo(w * 0.23f, h * 0.77f)
+                val upperRad = Math.toRadians(148.0)
+                lineTo(cx + r * cos(upperRad).toFloat(), cy + r * sin(upperRad).toFloat())
+                arcTo(arcRect, startAngleDegrees = 148f, sweepAngleDegrees = 148f, forceMoveTo = false)
+            }
+            drawPath(
+                path = path,
+                color = Color.White,
+                style = Stroke(width = strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            )
+
+            // Ascending precision signal bars
+            val barW = w * 0.074f
+            val barRadius = CornerRadius(barW * 0.5f, barW * 0.5f)
+            drawRoundRect(
+                color = Color.White,
+                topLeft = Offset(w * 0.375f, h * 0.46f),
+                size = Size(barW, h * 0.145f),
+                cornerRadius = barRadius
+            )
+            drawRoundRect(
+                color = Color.White,
+                topLeft = Offset(w * 0.495f, h * 0.385f),
+                size = Size(barW, h * 0.22f),
+                cornerRadius = barRadius
+            )
+
+            // Live sky-cyan realtime beacon dot
+            drawCircle(
+                color = Color(0xFF38BDF8),
+                radius = w * 0.065f,
+                center = Offset(w * 0.695f, h * 0.315f)
+            )
+        }
     }
 }
 
