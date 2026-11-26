@@ -2,6 +2,14 @@
 
 Quy ước phiên bản: `1.0.x` / `1.x.x` cho các bản cập nhật và sửa lỗi nhỏ (mỗi bậc tối đa `10`, ví dụ `1.0.10` → `1.1.0`); `x.0.0` dành cho thay đổi lớn về kiến trúc, ngôn ngữ lập trình, nâng phiên bản HĐH tối thiểu hoặc đại tu UI/UX.
 
+## v4.0.0 — Chat BLN Android (2026-11-26 23:17 UTC+7)
+
+- **Phiên bản**: `v4.0.0` (Build `40000`)
+- **Phân loại**: Cập nhật lớn (`x.0.0` — Kiến trúc / Ngôn ngữ / HĐH / Đại tu UI-UX)
+
+### 🚀 Thay đổi lớn (Cấu trúc / HĐH / UI-UX)
+- arch!: revert Android app to native Kotlin + Jetpack Compose with GitHub Releases update checker (`bfa8d04`)
+
 ## v3.0.0 — Chat BLN Android (Rust) (2026-11-26 23:02 UTC+7)
 
 - **Phiên bản**: `v3.0.0` (Build `30000`)
