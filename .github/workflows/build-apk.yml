@@ -149,11 +149,12 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || 'chatbln123' }}
         run: |
           set -euo pipefail
+          cp "$ANDROID_KEYSTORE_PATH" ./chatbln-release.jks
           cp Dioxus.toml "$RUNNER_TEMP/Dioxus.toml.bak"
           cat >> Dioxus.toml <<EOF
 
           [bundle.android]
-          jks_file = "${ANDROID_KEYSTORE_PATH}"
+          jks_file = "chatbln-release.jks"
           jks_password = "${ANDROID_KEYSTORE_PASSWORD}"
           key_alias = "${ANDROID_KEY_ALIAS}"
           key_password = "${ANDROID_KEY_PASSWORD}"
@@ -192,6 +193,7 @@ jobs:
 
           # Restore clean Dioxus.toml without CI keystore paths
           mv "$RUNNER_TEMP/Dioxus.toml.bak" Dioxus.toml
+          rm -f ./chatbln-release.jks
 
           for f in ChatBLN-arm32-v7a.apk ChatBLN-arm64-v8a.apk ChatBLN-arm-universal.apk; do
             if [ ! -s "dist-apk/$f" ]; then
