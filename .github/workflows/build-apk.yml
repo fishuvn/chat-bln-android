@@ -1,4 +1,4 @@
-name: Build Android APKs & Auto-Release
+name: Build Rust Android APKs & Auto-Release
 
 on:
   push:
@@ -18,7 +18,7 @@ on:
           - minor
           - major
       explicit_version:
-        description: 'Ghi đè phiên bản cụ thể (ví dụ 2.0.0, để trống nếu tự động)'
+        description: 'Ghi đè phiên bản cụ thể (ví dụ 3.0.0, để trống nếu tự động)'
         required: false
         default: ''
         type: string
@@ -28,12 +28,12 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build 3 Signed APKs & Publish Release
+    name: Build 3 Rust Signed APKs & Publish Release
     if: >-
       github.event_name != 'push' ||
       (!contains(github.event.head_commit.message, '[skip ci]') && github.actor != 'github-actions[bot]')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository (full history & tags)
@@ -46,30 +46,53 @@ jobs:
         id: ver
         run: |
           python3 .github/scripts/compute-release.py \
-            --platform "Chat BLN Android" \
+            --platform "Chat BLN Android (Rust)" \
             --bump "${{ inputs.bump_type || 'auto' }}" \
             --explicit-version "${{ inputs.explicit_version || '' }}" \
             --release-notes-out "$RUNNER_TEMP/RELEASE_NOTES.md" \
             --apply-files
 
-      - name: Set up JDK 21
+      - name: Set up Rust Toolchain (ARM32 + ARM64 Android targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+
+      - name: Run Rust Unit Tests (API, STOMP 1.2 & Update Checker)
+        run: cargo test --lib --no-default-features
+
+      - name: Install Dioxus CLI v0.7.10 (dx)
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSL "https://github.com/DioxusLabs/dioxus/releases/download/v0.7.10/dx-x86_64-unknown-linux-gnu.tar.gz" | tar -xz -C "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/dx" --version
+
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
-      - name: Accept Android SDK Licenses
+      - name: Configure Android SDK & NDK
         run: |
+          set -euo pipefail
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
           SDKMANAGER=$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager | sort -V | tail -n 1)
           yes | "$SDKMANAGER" --licenses >/dev/null || true
 
-      - name: Set up Gradle 8.10.2
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.10.2'
+          NDK_DIR=$(ls -d "$SDK_ROOT"/ndk/* 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -z "$NDK_DIR" ]; then
+            "$SDKMANAGER" "ndk;27.2.12479018"
+            NDK_DIR="$SDK_ROOT/ndk/27.2.12479018"
+          fi
+          BUILD_TOOLS=$(ls -d "$SDK_ROOT"/build-tools/* 2>/dev/null | sort -V | tail -n 1)
+
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+          echo "$BUILD_TOOLS" >> "$GITHUB_PATH"
+          echo "Using SDK=$SDK_ROOT NDK=$NDK_DIR BUILD_TOOLS=$BUILD_TOOLS"
 
       - name: Prepare Release Keystore
         env:
@@ -92,41 +115,74 @@ jobs:
           fi
           echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
 
-      - name: Build Release APKs (ARM 32-bit, ARM 64-bit, ARM Universal)
+      - name: Build & Package 3 Signed Rust APKs (arm32-v7a, arm64-v8a, universal)
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'chatbln123' }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || 'chatbln' }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || 'chatbln123' }}
-          APP_VERSION_NAME: ${{ steps.ver.outputs.version }}
-          APP_VERSION_CODE: ${{ steps.ver.outputs.build_number }}
         run: |
-          gradle assembleRelease --no-daemon --stacktrace
+          set -euo pipefail
+          cp Dioxus.toml "$RUNNER_TEMP/Dioxus.toml.bak"
+          cat >> Dioxus.toml <<EOF
 
-      - name: Collect & Verify 3 APK Outputs
-        run: |
-          mkdir -p dist-apk
-          VER="${{ steps.ver.outputs.version }}"
-          BLD="${{ steps.ver.outputs.build_number }}"
-          ls -lh app/build/outputs/apk/release/
+          [bundle.android]
+          jks_file = "${ANDROID_KEYSTORE_PATH}"
+          jks_password = "${ANDROID_KEYSTORE_PASSWORD}"
+          key_alias = "${ANDROID_KEY_ALIAS}"
+          key_password = "${ANDROID_KEY_PASSWORD}"
+          EOF
 
-          cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk dist-apk/ChatBLN-arm32-v7a.apk
-          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk dist-apk/ChatBLN-arm64-v8a.apk
-          cp app/build/outputs/apk/release/app-universal-release.apk dist-apk/ChatBLN-arm-universal.apk
+          mkdir -p dist-arm32 dist-arm64 dist-apk
+
+          echo "=== Building ARM64 (aarch64-linux-android) ==="
+          dx bundle --android --release --target aarch64-linux-android --package-types apk --out-dir dist-arm64
+          ARM64_APK=$(find dist-arm64 target -name "*.apk" -type f | head -n 1)
+          cp "$ARM64_APK" dist-apk/ChatBLN-arm64-v8a.apk
+
+          echo "=== Building ARM32 (armv7-linux-androideabi) ==="
+          dx bundle --android --release --target armv7-linux-androideabi --package-types apk --out-dir dist-arm32
+          ARM32_APK=$(find dist-arm32 -name "*.apk" -type f | head -n 1)
+          if [ -z "$ARM32_APK" ]; then
+            ARM32_APK=$(find target -name "*.apk" -type f -newer dist-apk/ChatBLN-arm64-v8a.apk | head -n 1)
+          fi
+          cp "$ARM32_APK" dist-apk/ChatBLN-arm32-v7a.apk
+
+          echo "=== Assembling Signed ARM Universal APK (armeabi-v7a + arm64-v8a) ==="
+          WORK_UNI="$RUNNER_TEMP/uni-apk"
+          rm -rf "$WORK_UNI" && mkdir -p "$WORK_UNI/arm32" "$WORK_UNI/merged"
+          unzip -q dist-apk/ChatBLN-arm32-v7a.apk "lib/armeabi-v7a/*" -d "$WORK_UNI/arm32"
+          cp dist-apk/ChatBLN-arm64-v8a.apk "$WORK_UNI/unsigned.apk"
+          zip -qd "$WORK_UNI/unsigned.apk" "META-INF/*" || true
+          (cd "$WORK_UNI/arm32" && zip -qr0 "$WORK_UNI/unsigned.apk" lib/armeabi-v7a)
+          zipalign -p -f 4 "$WORK_UNI/unsigned.apk" "$WORK_UNI/aligned.apk"
+          apksigner sign \
+            --ks "$ANDROID_KEYSTORE_PATH" \
+            --ks-pass "pass:${ANDROID_KEYSTORE_PASSWORD}" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --key-pass "pass:${ANDROID_KEY_PASSWORD}" \
+            --out dist-apk/ChatBLN-arm-universal.apk \
+            "$WORK_UNI/aligned.apk"
+
+          # Restore clean Dioxus.toml without CI keystore paths
+          mv "$RUNNER_TEMP/Dioxus.toml.bak" Dioxus.toml
 
           for f in ChatBLN-arm32-v7a.apk ChatBLN-arm64-v8a.apk ChatBLN-arm-universal.apk; do
             if [ ! -s "dist-apk/$f" ]; then
               echo "ERROR: Missing or empty APK $f"
               exit 1
             fi
+            apksigner verify "dist-apk/$f"
           done
 
+          VER="${{ steps.ver.outputs.version }}"
+          BLD="${{ steps.ver.outputs.build_number }}"
           cp CHANGELOG.md dist-apk/CHANGELOG.md
           (cd dist-apk && sha256sum *.apk > SHA256SUMS.txt)
 
           {
             cat "$RUNNER_TEMP/RELEASE_NOTES.md"
             echo ""
-            echo "### 📦 Gói cài đặt Android (\`v${VER}\` — Base VersionCode \`${BLD}\`)"
+            echo "### 📦 Gói cài đặt Android 100% Rust (\`v${VER}\` — Build \`${BLD}\`)"
             echo "| File APK | Kiến trúc đích | Dung lượng |"
             echo "| :--- | :--- | :--- |"
             echo "| \`ChatBLN-arm32-v7a.apk\` | ARM 32-bit (\`armeabi-v7a\`) | $(du -h dist-apk/ChatBLN-arm32-v7a.apk | cut -f1) |"
@@ -141,10 +197,10 @@ jobs:
 
           cat dist-apk/FULL_RELEASE_BODY.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Bundle (All 3 APKs + CHANGELOG + SHA256SUMS)
+      - name: Upload Bundle (All 3 Rust APKs + CHANGELOG + SHA256SUMS)
         uses: actions/upload-artifact@v4
         with:
-          name: ChatBLN-Android-All-APKs-v${{ steps.ver.outputs.version }}
+          name: ChatBLN-Android-Rust-APKs-v${{ steps.ver.outputs.version }}
           path: |
             dist-apk/ChatBLN-arm32-v7a.apk
             dist-apk/ChatBLN-arm64-v8a.apk
@@ -160,11 +216,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add VERSION CHANGELOG.md app/build.gradle.kts
+          git add VERSION CHANGELOG.md Cargo.toml Dioxus.toml
           if ! git diff --cached --quiet; then
             git commit -m "chore(release): ${TAG} [skip ci]"
             git pull --rebase origin main || true
-            git push origin HEAD:main || echo "Notice: skipped pushing release commit to main, tagging HEAD directly."
+            git push origin HEAD:main || echo "Notice: skipped pushing release commit to main."
           fi
 
           git tag -fa "$TAG" -m "Release ${TAG}"

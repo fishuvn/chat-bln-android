@@ -1,0 +1,14 @@
+[application]
+name = "Chat BLN"
+asset_dir = "assets"
+android_min_sdk_version = 26
+
+[bundle]
+identifier = "nhom3.chatbln.android"
+publisher = "Nhom 3 Chat BLN"
+version = "3.0.0"
+icon = ["assets/icon.png"]
+short_description = "Chat BLN Realtime Messaging (Rust)"
+
+[android]
+min_sdk = 26
