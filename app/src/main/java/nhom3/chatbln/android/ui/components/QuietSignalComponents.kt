@@ -8,16 +8,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import kotlin.math.cos
-import kotlin.math.sin
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -146,8 +139,8 @@ fun resolvePeerPresenceIcon(
 }
 
 /**
- * Unified Chat BLN "Signal Aperture" Brand Mark — pixel-consistent with Web `logo.svg`,
- * Android `ic_launcher_foreground.xml`, and iOS `ChatBLNBrandMark`.
+ * Unified Chat BLN "Dual Dialogue" Brand Mark (180-deg point-symmetric, pixel-consistent with
+ * Web `logo.svg`, Android `ic_launcher_foreground.xml`, and iOS `ChatBLNBrandMark`).
  */
 @Composable
 fun QuietSignalBrandMark(
@@ -161,56 +154,39 @@ fun QuietSignalBrandMark(
             .clip(RoundedCornerShape(cornerRadius))
             .background(
                 brush = Brush.linearGradient(
-                    colors = listOf(Color(0xFF1758EE), Color(0xFF0A369D))
+                    colors = listOf(Color(0xFF1D62F8), Color(0xFF0B3BC4))
                 )
             ),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(size)) {
-            val w = this.size.width
-            val h = this.size.height
-            val cx = w * 0.50f
-            val cy = h * 0.515f
-            val r = w * 0.275f
-            val strokeW = w * 0.072f
+            val s = minOf(this.size.width, this.size.height) / 64f
+            val ox = (this.size.width - 64f * s) * 0.5f
+            val oy = (this.size.height - 64f * s) * 0.5f
+            fun rect(l: Float, t: Float, r: Float, b: Float) =
+                Rect(ox + l * s, oy + t * s, ox + r * s, oy + b * s)
 
-            // Open geometric chat aperture arc with bottom-left speech tail
-            val arcRect = androidx.compose.ui.geometry.Rect(cx - r, cy - r, cx + r, cy + r)
-            val path = Path().apply {
-                arcTo(arcRect, startAngleDegrees = -12f, sweepAngleDegrees = 130f, forceMoveTo = true)
-                lineTo(w * 0.23f, h * 0.77f)
-                val upperRad = Math.toRadians(148.0)
-                lineTo(cx + r * cos(upperRad).toFloat(), cy + r * sin(upperRad).toFloat())
-                arcTo(arcRect, startAngleDegrees = 148f, sweepAngleDegrees = 148f, forceMoveTo = false)
+            // Back reply bubble (top-right, negative-space moat carved along front bubble)
+            val backPath = Path().apply {
+                arcTo(rect(22f, 14f, 43f, 35f), startAngleDegrees = 180f, sweepAngleDegrees = 90f, forceMoveTo = true)
+                arcTo(rect(44.6f, 14f, 51f, 20.4f), startAngleDegrees = 270f, sweepAngleDegrees = 90f, forceMoveTo = false)
+                arcTo(rect(30f, 16f, 51f, 37f), startAngleDegrees = 0f, sweepAngleDegrees = 67.97f, forceMoveTo = false)
+                arcTo(rect(18.5f, 24.5f, 44.5f, 50.5f), startAngleDegrees = -5.59f, sweepAngleDegrees = -84.41f, forceMoveTo = false)
+                lineTo(ox + 22f * s, oy + 24.5f * s)
+                close()
             }
-            drawPath(
-                path = path,
-                color = Color.White,
-                style = Stroke(width = strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round)
-            )
+            drawPath(path = backPath, color = Color(0xFF8AD5FF))
 
-            // Ascending precision signal bars
-            val barW = w * 0.074f
-            val barRadius = CornerRadius(barW * 0.5f, barW * 0.5f)
-            drawRoundRect(
-                color = Color.White,
-                topLeft = Offset(w * 0.375f, h * 0.46f),
-                size = Size(barW, h * 0.145f),
-                cornerRadius = barRadius
-            )
-            drawRoundRect(
-                color = Color.White,
-                topLeft = Offset(w * 0.495f, h * 0.385f),
-                size = Size(barW, h * 0.22f),
-                cornerRadius = barRadius
-            )
-
-            // Live sky-cyan realtime beacon dot
-            drawCircle(
-                color = Color(0xFF38BDF8),
-                radius = w * 0.065f,
-                center = Offset(w * 0.695f, h * 0.315f)
-            )
+            // Front primary bubble (bottom-left, exact 180-deg mirror around (32, 32))
+            val frontPath = Path().apply {
+                moveTo(ox + 23.5f * s, oy + 27f * s)
+                arcTo(rect(21f, 27f, 42f, 48f), startAngleDegrees = 270f, sweepAngleDegrees = 90f, forceMoveTo = false)
+                arcTo(rect(21f, 29f, 42f, 50f), startAngleDegrees = 0f, sweepAngleDegrees = 90f, forceMoveTo = false)
+                arcTo(rect(13f, 43.6f, 19.4f, 50f), startAngleDegrees = 90f, sweepAngleDegrees = 90f, forceMoveTo = false)
+                arcTo(rect(13f, 27f, 34f, 48f), startAngleDegrees = 180f, sweepAngleDegrees = 90f, forceMoveTo = false)
+                close()
+            }
+            drawPath(path = frontPath, color = Color.White)
         }
     }
 }
