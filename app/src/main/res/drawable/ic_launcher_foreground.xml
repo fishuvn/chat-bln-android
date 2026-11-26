@@ -4,11 +4,14 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Chat BLN Dual Dialogue (180-deg symmetric, scaled cleanly inside 66dp Adaptive Icon safe zone) -->
-    <path
-        android:fillColor="#8AD5FF"
-        android:pathData="M41.80,44.85 A12.81,12.81 0 0,1 54.61,32.04 H73.28 A3.90,3.90 0 0,1 77.18,35.94 V47.29 A12.81,12.81 0 0,1 69.17,59.16 A15.86,15.86 0 0,0 53.39,44.85 H41.80 Z" />
+    <!-- Chat BLN B-Dialogue (scaled cleanly inside 66dp Adaptive Icon circular safe zone) -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M43.63,47.90 H53.39 A12.81,12.81 0 0,1 66.20,60.71 V63.15 A12.81,12.81 0 0,1 53.39,75.96 H34.72 A3.90,3.90 0 0,1 30.82,72.06 V60.71 A12.81,12.81 0 0,1 43.63,47.90 Z" />
+        android:pathData="M36.61,29.56 H41.78 A2.35,2.35 0 0,1 44.13,31.91 V76.09 A2.35,2.35 0 0,1 41.78,78.44 H36.61 A4.70,4.70 0 0,1 31.91,73.74 V34.26 A4.70,4.70 0 0,1 36.61,29.56 Z" />
+    <path
+        android:fillColor="#BAE6FD"
+        android:pathData="M51.18,29.56 H62.58 A11.16,11.16 0 0,1 73.74,40.72 A11.16,11.16 0 0,1 62.58,51.88 H49.77 A1.41,1.41 0 0,1 48.36,50.48 V32.38 A2.82,2.82 0 0,1 51.18,29.56 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M49.77,56.12 H64.93 A11.16,11.16 0 0,1 76.09,67.28 A11.16,11.16 0 0,1 64.93,78.44 H51.18 A2.82,2.82 0 0,1 48.36,75.62 V57.52 A1.41,1.41 0 0,1 49.77,56.12 Z" />
 </vector>

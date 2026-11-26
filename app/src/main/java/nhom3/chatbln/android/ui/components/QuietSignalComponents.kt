@@ -9,7 +9,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -139,7 +138,7 @@ fun resolvePeerPresenceIcon(
 }
 
 /**
- * Unified Chat BLN "Dual Dialogue" Brand Mark (180-deg point-symmetric, pixel-consistent with
+ * Unified Chat BLN "B-Dialogue" Brand Mark (flat precision vector, pixel-consistent with
  * Web `logo.svg`, Android `ic_launcher_foreground.xml`, and iOS `ChatBLNBrandMark`).
  */
 @Composable
@@ -147,46 +146,42 @@ fun QuietSignalBrandMark(
     modifier: Modifier = Modifier,
     size: Dp = 56.dp
 ) {
-    val cornerRadius = (size.value * 0.25f).dp
+    val cornerRadius = (size.value * (58f / 256f)).dp
     Box(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(cornerRadius))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(Color(0xFF1D62F8), Color(0xFF0B3BC4))
-                )
-            ),
+            .background(Color(0xFF0F52BA)),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(size)) {
-            val s = minOf(this.size.width, this.size.height) / 64f
-            val ox = (this.size.width - 64f * s) * 0.5f
-            val oy = (this.size.height - 64f * s) * 0.5f
-            fun rect(l: Float, t: Float, r: Float, b: Float) =
-                Rect(ox + l * s, oy + t * s, ox + r * s, oy + b * s)
+            val scale = minOf(this.size.width, this.size.height) / 256f
+            val k = 0.72f
+            val cx = this.size.width * 0.5f
+            val cy = this.size.height * 0.5f
+            fun mx(x: Float) = cx + (x - 128f) * k * scale
+            fun my(y: Float) = cy + (y - 128f) * k * scale
+            fun mr(r: Float) = r * k * scale
 
-            // Back reply bubble (top-right, negative-space moat carved along front bubble)
-            val backPath = Path().apply {
-                arcTo(rect(22f, 14f, 43f, 35f), startAngleDegrees = 180f, sweepAngleDegrees = 90f, forceMoveTo = true)
-                arcTo(rect(44.6f, 14f, 51f, 20.4f), startAngleDegrees = 270f, sweepAngleDegrees = 90f, forceMoveTo = false)
-                arcTo(rect(30f, 16f, 51f, 37f), startAngleDegrees = 0f, sweepAngleDegrees = 67.97f, forceMoveTo = false)
-                arcTo(rect(18.5f, 24.5f, 44.5f, 50.5f), startAngleDegrees = -5.59f, sweepAngleDegrees = -84.41f, forceMoveTo = false)
-                lineTo(ox + 22f * s, oy + 24.5f * s)
-                close()
+            fun rrectPath(
+                x0: Float, y0: Float, x1: Float, y1: Float,
+                rtl: Float, rtr: Float, rbr: Float, rbl: Float
+            ): Path {
+                val l = mx(x0); val t = my(y0); val r = mx(x1); val b = my(y1)
+                val tl = mr(rtl); val tr = mr(rtr); val br = mr(rbr); val bl = mr(rbl)
+                return Path().apply {
+                    moveTo(l + tl, t)
+                    arcTo(Rect(r - 2 * tr, t, r, t + 2 * tr), 270f, 90f, false)
+                    arcTo(Rect(r - 2 * br, b - 2 * br, r, b), 0f, 90f, false)
+                    arcTo(Rect(l, b - 2 * bl, l + 2 * bl, b), 90f, 90f, false)
+                    arcTo(Rect(l, t, l + 2 * tl, t + 2 * tl), 180f, 90f, false)
+                    close()
+                }
             }
-            drawPath(path = backPath, color = Color(0xFF8AD5FF))
 
-            // Front primary bubble (bottom-left, exact 180-deg mirror around (32, 32))
-            val frontPath = Path().apply {
-                moveTo(ox + 23.5f * s, oy + 27f * s)
-                arcTo(rect(21f, 27f, 42f, 48f), startAngleDegrees = 270f, sweepAngleDegrees = 90f, forceMoveTo = false)
-                arcTo(rect(21f, 29f, 42f, 50f), startAngleDegrees = 0f, sweepAngleDegrees = 90f, forceMoveTo = false)
-                arcTo(rect(13f, 43.6f, 19.4f, 50f), startAngleDegrees = 90f, sweepAngleDegrees = 90f, forceMoveTo = false)
-                arcTo(rect(13f, 27f, 34f, 48f), startAngleDegrees = 180f, sweepAngleDegrees = 90f, forceMoveTo = false)
-                close()
-            }
-            drawPath(path = frontPath, color = Color.White)
+            drawPath(rrectPath(104f, 24f, 212f, 119f, 12f, 47.5f, 47.5f, 6f), color = Color(0xFFBAE6FD))
+            drawPath(rrectPath(34f, 24f, 86f, 232f, 20f, 10f, 10f, 20f), color = Color.White)
+            drawPath(rrectPath(104f, 137f, 222f, 232f, 6f, 47.5f, 47.5f, 12f), color = Color.White)
         }
     }
 }
