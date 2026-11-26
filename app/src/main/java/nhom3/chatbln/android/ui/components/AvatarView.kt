@@ -1,6 +1,7 @@
 package nhom3.chatbln.android.ui.components
 
 import android.util.Base64
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -9,27 +10,26 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bedtime
-import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
@@ -42,7 +42,6 @@ import nhom3.chatbln.android.ui.theme.OnlineIndicatorDark
 import nhom3.chatbln.android.ui.theme.OnlineIndicatorLight
 import nhom3.chatbln.android.ui.theme.SleepIndicatorDark
 import nhom3.chatbln.android.ui.theme.SleepIndicatorLight
-import java.util.Locale
 
 @Composable
 fun AvatarView(
@@ -56,7 +55,6 @@ fun AvatarView(
     isGroup: Boolean = false
 ) {
     val context = LocalContext.current
-    val initials = remember(displayName) { computeInitials(displayName) }
     val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val mode = remember(presenceStatus) { UserPresenceMode.fromRaw(presenceStatus) }
 
@@ -127,25 +125,22 @@ fun AvatarView(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                     loading = {
-                        InitialsFallback(
-                            initials = initials,
-                            size = size,
-                            isGroup = isGroup
+                        DefaultAvatarArtwork(
+                            isGroup = isGroup,
+                            darkTheme = darkTheme
                         )
                     },
                     error = {
-                        InitialsFallback(
-                            initials = initials,
-                            size = size,
-                            isGroup = isGroup
+                        DefaultAvatarArtwork(
+                            isGroup = isGroup,
+                            darkTheme = darkTheme
                         )
                     }
                 )
             } else {
-                InitialsFallback(
-                    initials = initials,
-                    size = size,
-                    isGroup = isGroup
+                DefaultAvatarArtwork(
+                    isGroup = isGroup,
+                    darkTheme = darkTheme
                 )
             }
         }
@@ -185,38 +180,83 @@ fun AvatarView(
 }
 
 @Composable
-private fun InitialsFallback(
-    initials: String,
-    size: Dp,
-    isGroup: Boolean
+private fun DefaultAvatarArtwork(
+    isGroup: Boolean,
+    darkTheme: Boolean
 ) {
-    if (isGroup) {
-        Icon(
-            imageVector = Icons.Outlined.Groups,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.size((size.value * 0.50f).dp)
-        )
+    val bgColor = if (darkTheme) {
+        Color(0xFF172554)
+    } else if (isGroup) {
+        Color(0xFFDBEAFE)
     } else {
-        Text(
-            text = initials,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = (size.value * 0.35f).coerceIn(12f, 26f).sp
-        )
+        Color(0xFFE6EFFC)
     }
-}
+    val primaryColor = if (darkTheme) Color(0xFFF8FAFC) else Color(0xFF0F52BA)
+    val accentColor = if (darkTheme) Color(0xFF60A5FA) else Color(0xFF3B82F6)
 
-private fun computeInitials(name: String): String {
-    val parts = name.trim()
-        .removePrefix("@")
-        .split(Regex("\\s+"))
-        .filter { it.isNotEmpty() }
-    if (parts.isEmpty()) return "?"
-    if (parts.size == 1) {
-        return parts[0].take(2).uppercase(Locale.getDefault())
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val s = minOf(size.width, size.height) / 128f
+        val ox = (size.width - 128f * s) * 0.5f
+        val oy = (size.height - 128f * s) * 0.5f
+        fun px(x: Float) = ox + x * s
+        fun py(y: Float) = oy + y * s
+        fun rrectPath(
+            x0: Float, y0: Float, x1: Float, y1: Float,
+            rtl: Float, rtr: Float, rbr: Float, rbl: Float
+        ): Path {
+            val l = px(x0); val t = py(y0); val r = px(x1); val b = py(y1)
+            val tl = rtl * s; val tr = rtr * s; val br = rbr * s; val bl = rbl * s
+            return Path().apply {
+                moveTo(l + tl, t)
+                arcTo(Rect(r - 2 * tr, t, r, t + 2 * tr), 270f, 90f, false)
+                arcTo(Rect(r - 2 * br, b - 2 * br, r, b), 0f, 90f, false)
+                arcTo(Rect(l, b - 2 * bl, l + 2 * bl, b), 90f, 90f, false)
+                arcTo(Rect(l, t, l + 2 * tl, t + 2 * tl), 180f, 90f, false)
+                close()
+            }
+        }
+
+        drawRect(color = bgColor)
+
+        if (isGroup) {
+            // Back-right secondary member separated by exact 5px concentric negative-space moat
+            drawCircle(
+                color = accentColor,
+                radius = 12f * s,
+                center = Offset(px(84f), py(49f))
+            )
+            val backTorso = Path().apply {
+                moveTo(px(71.52f), py(70f))
+                lineTo(px(90f), py(70f))
+                arcTo(Rect(px(73f), py(70f), px(107f), py(104f)), 270f, 90f, false)
+                arcTo(Rect(px(89f), py(78f), px(107f), py(96f)), 0f, 90f, false)
+                lineTo(px(75.71f), py(96f))
+                arcTo(Rect(px(32f), py(63f), px(78f), py(109f)), 25.77f, -69.85f, false)
+                close()
+            }
+            drawPath(path = backTorso, color = accentColor)
+
+            // Front-left primary member
+            drawCircle(
+                color = primaryColor,
+                radius = 15f * s,
+                center = Offset(px(47f), py(45f))
+            )
+            drawPath(
+                path = rrectPath(21f, 68f, 73f, 96f, 18f, 18f, 10f, 10f),
+                color = primaryColor
+            )
+        } else {
+            // Unified B-Dialogue geometric default user silhouette
+            drawPath(
+                path = rrectPath(29f, 72f, 99f, 102f, 20f, 20f, 10f, 10f),
+                color = accentColor
+            )
+            drawCircle(
+                color = primaryColor,
+                radius = 17f * s,
+                center = Offset(px(64f), py(45f))
+            )
+        }
     }
-    val first = parts.first().first()
-    val last = parts.last().first()
-    return "$first$last".uppercase(Locale.getDefault())
 }
