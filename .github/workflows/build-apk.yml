@@ -73,6 +73,33 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Configure Google Maven Central Mirror (prevent HTTP 429)
+        run: |
+          mkdir -p "$HOME/.gradle/init.d"
+          cat > "$HOME/.gradle/init.d/maven-mirror.gradle" <<'EOF'
+          def mirrorUrl = "https://maven-central.storage-download.googleapis.com/maven2"
+          def patchRepos = { repoHandler ->
+              repoHandler.all { repo ->
+                  if (repo instanceof MavenArtifactRepository) {
+                      def u = repo.url.toString()
+                      if (u.startsWith("https://repo.maven.apache.org/maven2") || u.startsWith("https://repo1.maven.org/maven2")) {
+                          repo.setUrl(mirrorUrl)
+                      }
+                  }
+              }
+          }
+          gradle.beforeProject { project ->
+              patchRepos(project.buildscript.repositories)
+              patchRepos(project.repositories)
+          }
+          gradle.settingsEvaluated { settings ->
+              patchRepos(settings.pluginManagement.repositories)
+              patchRepos(settings.dependencyResolutionManagement.repositories)
+          }
+          EOF
+          echo "org.gradle.internal.http.connectionTimeout=60000" >> "$HOME/.gradle/gradle.properties"
+          echo "org.gradle.internal.http.socketTimeout=60000" >> "$HOME/.gradle/gradle.properties"
+
       - name: Configure Android SDK & NDK
         run: |
           set -euo pipefail
