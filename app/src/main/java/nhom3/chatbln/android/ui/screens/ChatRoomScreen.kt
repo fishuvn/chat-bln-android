@@ -51,6 +51,7 @@ import androidx.compose.material.icons.outlined.GroupAdd
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
@@ -149,6 +150,7 @@ fun ChatRoomScreen(
         mutableStateOf(TextFieldValue(""))
     }
     var showAttachmentMenu by remember { mutableStateOf(false) }
+    var showOverflowMenu by remember { mutableStateOf(false) }
     var showEmojiSheet by rememberSaveable { mutableStateOf(false) }
     var showInfoSheet by rememberSaveable { mutableStateOf(false) }
     var activeInviteCodeSheet by rememberSaveable { mutableStateOf<String?>(null) }
@@ -725,74 +727,104 @@ fun ChatRoomScreen(
                         }
                     },
                     actions = {
-                        if (allMessages.isNotEmpty() || isSelectionMode) {
-                            IconButton(
+                        if (isSelectionMode) {
+                            TextButton(
                                 onClick = {
-                                    isSelectionMode = !isSelectionMode
+                                    isSelectionMode = false
                                     selectedMessageIds = emptySet()
                                 },
-                                modifier = Modifier.size(48.dp)
+                                modifier = Modifier.heightIn(min = 48.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Checklist,
-                                    contentDescription = if (isSelectionMode) {
-                                        "Thoát chế độ chọn tin nhắn"
-                                    } else {
-                                        "Chọn nhiều tin nhắn"
-                                    },
-                                    tint = if (isSelectionMode) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    }
-                                )
+                                Text("Xong")
                             }
-                        }
-                        IconButton(
-                            onClick = {
-                                showSearchBar = !showSearchBar
-                                if (!showSearchBar) viewModel.setInChatSearchQuery("")
-                            },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Search,
-                                contentDescription = if (showSearchBar) {
-                                    "Đóng tìm kiếm trong cuộc trò chuyện"
-                                } else {
-                                    "Tìm trong cuộc trò chuyện"
-                                },
-                                tint = if (showSearchBar) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                        }
-                        IconButton(
-                            onClick = { showInfoSheet = true },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            BadgedBox(
-                                badge = {
-                                    if (pendingJoinCount > 0) {
-                                        Badge {
-                                            Text(
-                                                if (pendingJoinCount > 99) "99+" else pendingJoinCount.toString()
-                                            )
+                        } else {
+                            Box {
+                                IconButton(
+                                    onClick = { showOverflowMenu = true },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    BadgedBox(
+                                        badge = {
+                                            if (pendingJoinCount > 0) {
+                                                Badge {
+                                                    Text(
+                                                        if (pendingJoinCount > 99) "99+" else pendingJoinCount.toString()
+                                                    )
+                                                }
+                                            }
                                         }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.MoreVert,
+                                            contentDescription = if (pendingJoinCount > 0) {
+                                                "Tùy chọn cuộc trò chuyện, có $pendingJoinCount yêu cầu tham gia chờ duyệt"
+                                            } else {
+                                                "Tùy chọn cuộc trò chuyện"
+                                            },
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                 }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Info,
-                                    contentDescription = if (pendingJoinCount > 0) {
-                                        "Thông tin hội thoại, có $pendingJoinCount yêu cầu tham gia chờ duyệt"
-                                    } else {
-                                        "Thông tin hội thoại"
-                                    },
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+
+                                DropdownMenu(
+                                    expanded = showOverflowMenu,
+                                    onDismissRequest = { showOverflowMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                if (conversation.isGroup && pendingJoinCount > 0) {
+                                                    "Thông tin nhóm ($pendingJoinCount chờ duyệt)"
+                                                } else if (conversation.isGroup) {
+                                                    "Thông tin nhóm"
+                                                } else {
+                                                    "Thông tin hội thoại"
+                                                }
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Info,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = {
+                                            showOverflowMenu = false
+                                            showInfoSheet = true
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(if (showSearchBar) "Đóng tìm kiếm" else "Tìm tin nhắn")
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Search,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = {
+                                            showOverflowMenu = false
+                                            showSearchBar = !showSearchBar
+                                            if (!showSearchBar) viewModel.setInChatSearchQuery("")
+                                        }
+                                    )
+                                    if (allMessages.isNotEmpty()) {
+                                        DropdownMenuItem(
+                                            text = { Text("Chọn nhiều tin nhắn") },
+                                            leadingIcon = {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.Checklist,
+                                                    contentDescription = null
+                                                )
+                                            },
+                                            onClick = {
+                                                showOverflowMenu = false
+                                                isSelectionMode = true
+                                            }
+                                        )
+                                    }
+                                }
                             }
                         }
                     },
