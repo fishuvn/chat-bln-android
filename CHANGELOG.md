@@ -2,6 +2,18 @@
 
 Quy ước phiên bản: `1.0.x` / `1.x.x` cho các bản cập nhật và sửa lỗi nhỏ (mỗi bậc tối đa `10`, ví dụ `1.0.10` → `1.1.0`); `x.0.0` dành cho thay đổi lớn về kiến trúc, ngôn ngữ lập trình, nâng phiên bản HĐH tối thiểu hoặc đại tu UI/UX.
 
+## v3.0.0 — Chat BLN Android (Rust) (2026-11-26 23:02 UTC+7)
+
+- **Phiên bản**: `v3.0.0` (Build `30000`)
+- **Phân loại**: Cập nhật lớn (`x.0.0` — Kiến trúc / Ngôn ngữ / HĐH / Đại tu UI-UX)
+
+### 🚀 Thay đổi lớn (Cấu trúc / HĐH / UI-UX)
+- arch!: rebuild complete Android app in 100% Rust (Dioxus 0.7) and add GitHub Releases update checker (`196a0fa`)
+
+### 🐛 Sửa lỗi
+- fix(ci): use relative jks_file path for Dioxus Android release signing (`046a37b`)
+- fix(ci): route Maven Central through Google GCS mirror to avoid HTTP 429 (`31cc1f7`)
+
 ## v2.0.0 — Chat BLN Android (2026-11-26 02:18 UTC+7)
 
 - **Phiên bản**: `v2.0.0` (Build `20000`)
